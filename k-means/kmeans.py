@@ -77,4 +77,5 @@ print("The means:")
 print(hcl_means)
 
 f = top("vhls")
-print(f)
+with open("kmeans.cpp","w") as outfile:
+    outfile.write(f)
