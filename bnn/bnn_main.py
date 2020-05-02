@@ -7,7 +7,7 @@ hcl.init(hcl.Int())
 def build_bnn(input_image, weight_conv1):
     # first conv
     # 1*16*16
-    return hlib.op.bnn.conv2d_nchw(input_image, weight_conv1)#, padding=[2,2]) # 64*16*16
+    return hlib.op.bnn.conv2d_nchw(input_image, weight_conv1, padding=[1,1]) # 64*16*16
     # return conv1
     # tanh1 = hlib.bnn.tanh(conv1, "tanh1")
     # pool1 = hlib.bnn.max_pool(tanh1, kernel=(2,2), stride=(2,2)) # 32*14*14
@@ -50,4 +50,5 @@ hcl_image = hcl.asarray(np_image)
 hcl_weight = hcl.asarray(np_weight)
 hcl_out = hcl.asarray(np.zeros((1,64,16,16)))
 f(hcl_image,hcl_weight,hcl_out)
-print(hcl_out.asnumpy()[0][0][:14,:14])
+print(hcl_out.asnumpy().shape)
+print(hcl_out.asnumpy()[0][0])
