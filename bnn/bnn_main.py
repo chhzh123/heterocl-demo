@@ -2,8 +2,6 @@ import heterocl as hcl
 import hlib
 import numpy as np
 
-hcl.init(hcl.Float())
-
 # compute declaration
 def build_bnn(input_image, w_conv1,
               gamma1, beta1, miu1, sigma1,
@@ -43,9 +41,9 @@ params = {
     "beta2"  : np.loadtxt("data/weight_7p",delimiter=",").astype(np.float),
     "miu2"   : np.loadtxt("data/weight_8p",delimiter=",").astype(np.float),
     "sigma2" : np.loadtxt("data/weight_9p",delimiter=",").astype(np.float),
-    "w_fc1"  : np.loadtxt("data/weight_10b",delimiter=",").astype(np.float).reshape((2048,512)).T,
+    "w_fc1"  : np.loadtxt("data/weight_10b",delimiter=",").astype(np.int).reshape((2048,512)).T,
     "b_fc1"  : np.loadtxt("data/weight_11p",delimiter=",").astype(np.float),
-    "w_fc2"  : np.loadtxt("data/weight_12b",delimiter=",").astype(np.float).reshape((512,10)).T,
+    "w_fc2"  : np.loadtxt("data/weight_12b",delimiter=",").astype(np.int).reshape((512,10)).T,
     "b_fc2"  : np.loadtxt("data/weight_13p",delimiter=",").astype(np.float)
 }
 
@@ -54,11 +52,12 @@ hcl_array = []
 hcl_ph = []
 input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
 for name in params:
-    dtype = qtype_bit if "conv" in name else qtype_float
+    dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
     hcl_array.append(hcl.asarray(params[name],dtype=dtype))
     hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
-hcl_out = hcl.asarray(np.zeros((batch_size,10)))
+hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
 
+# build the network
 scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
 s = hcl.create_schedule_from_scheme(scheme)
 f = hcl.build(s, target=target)
