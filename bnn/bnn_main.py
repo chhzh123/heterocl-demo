@@ -20,7 +20,7 @@ def build_bnn(input_image, w_conv1, w_conv2,
     fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False) # 512->10
     return fc2
 
-batch_size = 1
+batch_size = 100
 qtype_bit = hcl.Int()
 qtype_float = hcl.Float()
 
@@ -60,7 +60,9 @@ f = build_bnn_inf()
 
 # prepare the numpy arrays for testing
 images = np.loadtxt("data/test_b.dat").astype(np.int).reshape((-1,1,16,16)) # 5000 images
-print("Loaded {} images".format(images.shape[0]))
+labels = np.loadtxt("data/label.dat").astype(np.int)
+num_images = images.shape[0]
+print("Loaded {} images".format(num_images))
 np_w_conv1 = np.loadtxt("data/weight_0b",delimiter=",").astype(np.int).reshape((1,64,3,3)) # 576
 np_w_conv1 = np_w_conv1.transpose(1,0,2,3)
 np_gamma1 = np.loadtxt("data/weight_1p",delimiter=",").astype(np.float)
@@ -79,9 +81,6 @@ np_b_fc1 = np.loadtxt("data/weight_11p",delimiter=",").astype(np.float)
 np_w_fc2 = np.loadtxt("data/weight_12b",delimiter=",").astype(np.float).reshape((512,10))
 np_w_fc2 = np_w_fc2.T
 np_b_fc2 = np.loadtxt("data/weight_13p",delimiter=",").astype(np.float)
-np_image = images[:1,:,:,:] # batch_size=1
-
-hcl_image = hcl.asarray(np_image, dtype=qtype_bit)
 
 hcl_w_conv1 = hcl.asarray(np_w_conv1, dtype=qtype_bit)
 hcl_gamma1 = hcl.asarray(np_gamma1, dtype=qtype_float)
@@ -99,11 +98,20 @@ hcl_w_fc1 = hcl.asarray(np_w_fc1, dtype=qtype_float)
 hcl_b_fc1 = hcl.asarray(np_b_fc1, dtype=qtype_float)
 hcl_w_fc2 = hcl.asarray(np_w_fc2, dtype=qtype_float)
 hcl_b_fc2 = hcl.asarray(np_b_fc2, dtype=qtype_float)
-hcl_out = hcl.asarray(np.zeros((1,10)))
-f(hcl_image, hcl_w_conv1, hcl_w_conv2,
-    hcl_gamma1, hcl_beta1, hcl_miu1, hcl_sigma1,
-    hcl_gamma2, hcl_beta2, hcl_miu2, hcl_sigma2,
-    hcl_w_fc1, hcl_b_fc1,
-    hcl_w_fc2, hcl_b_fc2,
-    hcl_out)
-print(hcl_out)
+hcl_out = hcl.asarray(np.zeros((batch_size,10)))
+
+correct_sum = 0
+for i in range(num_images // batch_size):
+    np_image = images[i*batch_size:(i+1)*batch_size]
+    hcl_image = hcl.asarray(np_image, dtype=qtype_bit)
+    f(hcl_image, hcl_w_conv1, hcl_w_conv2,
+        hcl_gamma1, hcl_beta1, hcl_miu1, hcl_sigma1,
+        hcl_gamma2, hcl_beta2, hcl_miu2, hcl_sigma2,
+        hcl_w_fc1, hcl_b_fc1,
+        hcl_w_fc2, hcl_b_fc2,
+        hcl_out)
+    prediction = np.argmax(hcl_out.asnumpy(), axis=1)
+    correct_sum += np.sum(np.equal(prediction, labels[i*batch_size:(i+1)*batch_size]))
+    if (i+1) % 10 == 0:
+        print("Done {} batches.".format(i+1))
+print("Testing accuracy: {}".format(correct_sum / float(num_images)))
