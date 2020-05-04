@@ -22,8 +22,9 @@ def build_bnn(input_image, w_conv1,
 
 target = None
 batch_size = 100
-qtype_bit = hcl.Int()
-qtype_float = hcl.Float()
+qtype_bit = hcl.UInt(1) # weights
+qtype_int = hcl.Int(10) # not unsigned!
+qtype_float = hcl.Float() #hcl.Fixed(16,14)
 
 # prepare the numpy arrays for testing
 images = np.loadtxt("data/test_b.dat").astype(np.int).reshape((-1,1,16,16)) # 5000 images
@@ -50,7 +51,7 @@ params = {
 # declare hcl array and placeholders
 hcl_array = []
 hcl_ph = []
-input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
+input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_int)
 for name in params:
     dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
     hcl_array.append(hcl.asarray(params[name],dtype=dtype))
@@ -65,7 +66,7 @@ f = hcl.build(s, target=target)
 correct_sum = 0
 for i in range(num_images // batch_size):
     np_image = images[i*batch_size:(i+1)*batch_size]
-    hcl_image = hcl.asarray(np_image, dtype=qtype_bit)
+    hcl_image = hcl.asarray(np_image, dtype=qtype_int)
     f(hcl_image, *hcl_array, hcl_out)
     prediction = np.argmax(hcl_out.asnumpy(), axis=1)
     correct_sum += np.sum(np.equal(prediction, labels[i*batch_size:(i+1)*batch_size]))
