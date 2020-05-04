@@ -24,7 +24,7 @@ target = None
 batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(10) # not unsigned!
-qtype_float = hcl.Float() #hcl.Fixed(16,14)
+qtype_float = hcl.Fixed(25,13) # hcl.Float()
 
 # prepare the numpy arrays for testing
 images = np.loadtxt("data/test_b.dat").astype(np.int).reshape((-1,1,16,16)) # 5000 images
