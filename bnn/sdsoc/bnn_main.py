@@ -2,6 +2,13 @@ import heterocl as hcl
 import hlib
 import numpy as np
 
+target = None
+batch_size = 100
+test_size = 100
+qtype_bit = hcl.UInt(1) # weights
+qtype_int = hcl.Int(10) # not unsigned!
+qtype_float = hcl.Fixed(25,13) # hcl.Float()
+
 # compute declaration
 def build_bnn(input_image, w_conv1,
               gamma1, beta1, miu1, sigma1,
@@ -20,35 +27,15 @@ def build_bnn(input_image, w_conv1,
     fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False) # 512->10
     return fc2
 
-target = None
-batch_size = 100
-qtype_bit = hcl.UInt(1) # weights
-qtype_int = hcl.Int(10) # not unsigned!
-qtype_float = hcl.Fixed(25,13) # hcl.Float()
-
-# prepare the numpy arrays for testing
-images = np.loadtxt("data/test_b.dat").astype(np.int).reshape((-1,1,16,16)) # 5000 images
-labels = np.loadtxt("data/label.dat").astype(np.int)
+# prepare numpy arrays for testing
+data = np.load("data/bnn-sdsoc.data.npz")
+images = data["images"][:test_size]
+labels = data["labels"][:test_size]
 num_images = images.shape[0]
 print("Loaded {} images".format(num_images))
-params = {
-    "w_conv1": np.loadtxt("data/weight_0b",delimiter=",").astype(np.int).reshape((1,64,3,3)).transpose(1,0,2,3), # 576
-    "gamma1" : np.loadtxt("data/weight_1p",delimiter=",").astype(np.float),
-    "beta1"  : np.loadtxt("data/weight_2p",delimiter=",").astype(np.float),
-    "miu1"   : np.loadtxt("data/weight_3p",delimiter=",").astype(np.float),
-    "sigma1" : np.loadtxt("data/weight_4p",delimiter=",").astype(np.float),
-    "w_conv2": np.loadtxt("data/weight_5b",delimiter=",").astype(np.int).reshape((64,128,3,3)).transpose(1,0,2,3),
-    "gamma2" : np.loadtxt("data/weight_6p",delimiter=",").astype(np.float),
-    "beta2"  : np.loadtxt("data/weight_7p",delimiter=",").astype(np.float),
-    "miu2"   : np.loadtxt("data/weight_8p",delimiter=",").astype(np.float),
-    "sigma2" : np.loadtxt("data/weight_9p",delimiter=",").astype(np.float),
-    "w_fc1"  : np.loadtxt("data/weight_10b",delimiter=",").astype(np.int).reshape((2048,512)).T,
-    "b_fc1"  : np.loadtxt("data/weight_11p",delimiter=",").astype(np.float),
-    "w_fc2"  : np.loadtxt("data/weight_12b",delimiter=",").astype(np.int).reshape((512,10)).T,
-    "b_fc2"  : np.loadtxt("data/weight_13p",delimiter=",").astype(np.float)
-}
+params = np.load("data/bnn-sdsoc.params.npz")
 
-# declare hcl array and placeholders
+# declare hcl placeholders
 hcl_array = []
 hcl_ph = []
 input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_int)

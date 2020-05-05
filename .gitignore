@@ -1,2 +1,5 @@
 *_prj
 *.log
+*.txt
+
+.ipynb_checkpoints
