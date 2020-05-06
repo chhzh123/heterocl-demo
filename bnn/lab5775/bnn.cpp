@@ -4,13 +4,13 @@
 #include <math.h>
 #include <stdint.h>
 
-void default_function(ap_int<10>* input_image, ap_uint<1>* w_conv1, float* bn_t1, ap_uint<1>* w_conv2, float* bn_t2, ap_uint<1>* w_fc1, float* b_fc1, ap_uint<1>* w_fc2, float* b_fc2, float* binary_dense) {
-                                                                  ap_int<32> _top;
+void default_function(ap_int<10> input_image[100*1*16*16], ap_uint<1> w_conv1[16*1*3*3], float bn_t1[16*16*16], ap_uint<1> w_conv2[32*16*3*3], float bn_t2[32*8*8], ap_uint<1> w_fc1[256*512], float b_fc1[256], ap_uint<1> w_fc2[10*256], float b_fc2[10], float binary_dense[100*10]) {
+  ap_int<32> _top;
   ap_int<10> pad_temp[32400];
   for (ap_int<32> indices = 0; indices < 100; ++indices) {
     for (ap_int<32> index_tuple = 0; index_tuple < 18; ++index_tuple) {
       for (ap_int<32> i = 0; i < 18; ++i) {
-        pad_temp[((i + (index_tuple * 18)) + (indices * 324))] = (((((1 <= index_tuple) && (index_tuple < 17)) && (1 <= i)) && (i < 17)) ? input_image[(((i + (index_tuple * 16)) + (indices * 256)) + -17)] : ((ap_int<10>)(ap_int<10>)0));
+        pad_temp[((i + (index_tuple * 18)) + (indices * 324))] = (((((1 <= index_tuple) && (index_tuple < 17)) && (1 <= i)) && (i < 17)) ? ((ap_int<10>)input_image[(((i + (index_tuple * 16)) + (indices * 256)) + -17)]) : ((ap_int<10>)(ap_int<10>)0));
       }
     }
   }
@@ -23,7 +23,7 @@ void default_function(ap_int<10>* input_image, ap_uint<1>* w_conv1, float* bn_t1
           sum = (ap_int<10>)0;
           for (ap_int<32> ry = 0; ry < 3; ++ry) {
             for (ap_int<32> rx = 0; rx < 3; ++rx) {
-              sum = ((ap_int<10>)(((ap_int<33>)(((((((ap_int<33>)1 - ((ap_int<33>)rx)) <= ((ap_int<33>)xx)) && (((ap_int<33>)xx) < ((ap_int<33>)17 - ((ap_int<33>)rx)))) && (((ap_int<33>)1 - ((ap_int<33>)ry)) <= ((ap_int<33>)yy))) && (((ap_int<33>)yy) < ((ap_int<33>)17 - ((ap_int<33>)ry)))) ? (((1 - ((ap_int<32>)(pad_temp[(((xx + rx) + ((yy + ry) * 18)) + (nn * 324))] ^ w_conv1[((rx + (ry * 3)) + (ff * 9))]))) << 1) + -1) : 0)) + ((ap_int<33>)sum)));
+              sum = ((ap_int<10>)(((ap_int<33>)(((((((ap_int<33>)1 - ((ap_int<33>)rx)) <= ((ap_int<33>)xx)) && (((ap_int<33>)xx) < ((ap_int<33>)17 - ((ap_int<33>)rx)))) && (((ap_int<33>)1 - ((ap_int<33>)ry)) <= ((ap_int<33>)yy))) && (((ap_int<33>)yy) < ((ap_int<33>)17 - ((ap_int<33>)ry)))) ? ((ap_int<32>)(((1 - ((ap_int<32>)(pad_temp[(((xx + rx) + ((yy + ry) * 18)) + (nn * 324))] ^ w_conv1[((rx + (ry * 3)) + (ff * 9))]))) << 1) + -1)) : ((ap_int<32>)0))) + ((ap_int<33>)sum)));
             }
           }
           conv1[(((xx + (yy * 16)) + (ff * 256)) + (nn * 4096))] = sum;
@@ -73,7 +73,7 @@ void default_function(ap_int<10>* input_image, ap_uint<1>* w_conv1, float* bn_t1
     for (ap_int<32> not_zero1 = 0; not_zero1 < 16; ++not_zero1) {
       for (ap_int<32> index_tuple2 = 0; index_tuple2 < 10; ++index_tuple2) {
         for (ap_int<32> i4 = 0; i4 < 10; ++i4) {
-          pad_temp1[(((i4 + (index_tuple2 * 10)) + (not_zero1 * 100)) + (indices2 * 1600))] = (((((1 <= index_tuple2) && (index_tuple2 < 9)) && (1 <= i4)) && (i4 < 9)) ? binary_max_pool2d[((((i4 + (index_tuple2 * 8)) + (not_zero1 * 64)) + (indices2 * 1024)) + -9)] : ((ap_int<10>)(ap_int<10>)0));
+          pad_temp1[(((i4 + (index_tuple2 * 10)) + (not_zero1 * 100)) + (indices2 * 1600))] = (((((1 <= index_tuple2) && (index_tuple2 < 9)) && (1 <= i4)) && (i4 < 9)) ? ((ap_int<10>)binary_max_pool2d[((((i4 + (index_tuple2 * 8)) + (not_zero1 * 64)) + (indices2 * 1024)) + -9)]) : ((ap_int<10>)(ap_int<10>)0));
         }
       }
     }
@@ -88,7 +88,7 @@ void default_function(ap_int<10>* input_image, ap_uint<1>* w_conv1, float* bn_t1
           for (ap_int<32> rc = 0; rc < 16; ++rc) {
             for (ap_int<32> ry1 = 0; ry1 < 3; ++ry1) {
               for (ap_int<32> rx1 = 0; rx1 < 3; ++rx1) {
-                sum1 = ((ap_int<10>)(((ap_int<33>)(((((((ap_int<33>)1 - ((ap_int<33>)rx1)) <= ((ap_int<33>)xx1)) && (((ap_int<33>)xx1) < ((ap_int<33>)9 - ((ap_int<33>)rx1)))) && (((ap_int<33>)1 - ((ap_int<33>)ry1)) <= ((ap_int<33>)yy1))) && (((ap_int<33>)yy1) < ((ap_int<33>)9 - ((ap_int<33>)ry1)))) ? (((1 - ((ap_int<32>)(pad_temp1[((((xx1 + rx1) + ((yy1 + ry1) * 10)) + (rc * 100)) + (nn1 * 1600))] ^ w_conv2[(((rx1 + (ry1 * 3)) + (rc * 9)) + (ff1 * 144))]))) << 1) + -1) : 0)) + ((ap_int<33>)sum1)));
+                sum1 = ((ap_int<10>)(((ap_int<33>)(((((((ap_int<33>)1 - ((ap_int<33>)rx1)) <= ((ap_int<33>)xx1)) && (((ap_int<33>)xx1) < ((ap_int<33>)9 - ((ap_int<33>)rx1)))) && (((ap_int<33>)1 - ((ap_int<33>)ry1)) <= ((ap_int<33>)yy1))) && (((ap_int<33>)yy1) < ((ap_int<33>)9 - ((ap_int<33>)ry1)))) ? ((ap_int<32>)(((1 - ((ap_int<32>)(pad_temp1[((((xx1 + rx1) + ((yy1 + ry1) * 10)) + (rc * 100)) + (nn1 * 1600))] ^ w_conv2[(((rx1 + (ry1 * 3)) + (rc * 9)) + (ff1 * 144))]))) << 1) + -1)) : ((ap_int<32>)0))) + ((ap_int<33>)sum1)));
               }
             }
           }
