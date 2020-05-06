@@ -15,14 +15,14 @@ def build_bnn(input_image, w_conv1, bn_t1,
               w_fc1, b_fc1,
               w_fc2, b_fc2): # 1*16*16
     conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1") # 16*16*16
-    bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1)
-    maxpool1 = hlib.op.bnn.max_pool2d_nchw(bn1, [2,2], [2,2]) # 16*8*8
+    bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
+    maxpool1 = hlib.op.bnn.max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
     conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2") # 32*8*8
-    bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2)
-    maxpool2 = hlib.op.bnn.max_pool2d_nchw(bn2, [2,2], [2,2]) # 32*4*4=512
-    flat = hlib.op.bnn.flatten(maxpool2)
-    fc1 = hlib.op.bnn.dense(flat, w_fc1, b_fc1, True) # 512->256
-    fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False) # 256->10
+    bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
+    maxpool2 = hlib.op.bnn.max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
+    fc1 = hlib.op.bnn.dense(flat, w_fc1, b_fc1, True, name="fc1") # 512->256
+    fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256->10
     return fc2
 
 # prepare numpy arrays for testing
@@ -43,6 +43,13 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
+    for layer in build_bnn.__dict__.keys():
+        s_layer = getattr(build_bnn,layer)
+        if "conv" in layer or "pool" in layer:
+            s[s_layer].pipeline(s_layer.axis[4])
+            s[s_layer].unroll(s_layer.axis[5])
+        elif "fc" in layer:
+            s[s_layer].pipeline(s_layer.axis[1])
     return hcl.build(s, target=target)
 
 if __name__ == '__main__':
