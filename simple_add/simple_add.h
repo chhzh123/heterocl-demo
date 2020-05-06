@@ -14,6 +14,6 @@ using namespace std;
 typedef ap_int<32> in_data_t;
 typedef ap_uint<4> out_data_t;
 
-void default_function(in_data_t A[10][10], out_data_t B[8][8]);
+void default_function(in_data_t A[10*10], out_data_t B[8*8]);
 
 #endif // SIMPLE_ADD_H

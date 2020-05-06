@@ -22,10 +22,19 @@ int main(int argc, char **argv)
         for (int j = 0; j < A_COLS-2; ++j)
             sw_result[i][j] = A[i][j] + A[i+2][j+2];
 
+  in_data_t A_stream[100];
+  out_data_t hw_result_stream[64];
+  for (int i = 0; i < 10; ++i)
+    for (int j = 0; j < 10; ++j)
+      A_stream[i * 10 + j] = A[i][j];
 #ifdef HW_COSIM
     // Run the Vivado HLS matrix adder
-    default_function(A, hw_result);
+    default_function(A_stream, hw_result_stream);
 #endif
+
+    for (int i = 0; i < 8; ++i)
+      for (int j = 0; j < 8; ++j)
+        hw_result[i][j] = hw_result_stream[i * 8 + j];
 
     // Print results
     for (int i = 0; i < A_ROWS-2; i++)
