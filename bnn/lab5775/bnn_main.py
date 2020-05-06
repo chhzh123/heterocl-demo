@@ -46,10 +46,10 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     for layer in build_bnn.__dict__.keys():
         s_layer = getattr(build_bnn,layer)
         if "conv" in layer or "pool" in layer:
-            s[s_layer].pipeline(s_layer.axis[4])
-            s[s_layer].unroll(s_layer.axis[5])
+            s[s_layer].pipeline(s_layer.axis[3])
+            s[s_layer].unroll(s_layer.axis[4])
         elif "fc" in layer:
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[0])
     return hcl.build(s, target=target)
 
 if __name__ == '__main__':
