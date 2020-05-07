@@ -43,23 +43,42 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
+
+    def plot_dataflow_graph():
+        import matplotlib.pyplot as plt
+        import networkx as nx
+        graph, op = s.dataflow_graph(plot=True)
+        nx.draw(graph, with_labels=True)
+        plt.savefig("bnn.png")
+
+    # print(build_bnn.__dict__.keys())
     for layer in build_bnn.__dict__.keys():
         s_layer = getattr(build_bnn,layer)
-        if "conv" in layer or "pool" in layer:
-            s[s_layer].pipeline(s_layer.axis[3])
-            s[s_layer].unroll(s_layer.axis[5])
-        elif "fc" in layer:
+        if "conv" in layer:
+            pass
+            # s[s_layer].pipeline(s_layer.axis[2])
+            # s[s_layer].unroll(s_layer.axis[5])
+        elif  "pool" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
-        elif "bn" in layer:
+        elif "fc" in layer:
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif "bn" in layer: # fuse
             s_conv = getattr(build_bnn,"conv" + layer[-1])
             s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
-            s[s_layer].pipeline(s_layer.axis[3]) # will be refreshed
+            if layer == "bn1":
+                s[s_layer].pipeline(s_layer.axis[2]) # will be refreshed
+            else:
+                s[s_layer].pipeline(s_layer.axis[3])
         elif "flatten" in layer:
-            s_pool = getattr(build_bnn,"maxpool2")
-            s[s_pool].compute_at(s[s_layer],s_layer.axis[0])
+            s[s_layer].pipeline(s_layer.axis[0])
+            # s_pool = getattr(build_bnn,"maxpool2")
+            # s[s_pool].compute_at(s[s_layer],s_layer.axis[0])
         elif "dense_relu" in layer:
             s_fc = getattr(build_bnn,"fc1")
             s[s_fc].compute_at(s[s_layer],s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[1])
+        # elif "pad" in layer:
+        #     s[s_layer].pipeline(s_layer.axis[1])
     return hcl.build(s, target=target)
 
 if __name__ == '__main__':
