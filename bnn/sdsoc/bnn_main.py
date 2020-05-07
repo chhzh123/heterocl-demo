@@ -6,7 +6,7 @@ target = None
 batch_size = 100
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
-qtype_int = hcl.Int(10) # not unsigned!
+qtype_int = hcl.Int(12) # not unsigned!
 qtype_float = hcl.Fixed(25,13) # hcl.Float()
 
 # compute declaration

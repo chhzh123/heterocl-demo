@@ -66,6 +66,9 @@ def build_bnn_inf(batch_size=batch_size,target=target):
         elif "fc" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif "flatten" in layer:
+            # axis_fuse = s[s_layer].fuse(s_layer.axis[0],s_layer.axis[1])
+            # x_out, x_in = s[s_layer].split(axis_fuse,32)
+            # s[s_layer].pipeline(x_in)
             s[s_layer].pipeline(s_layer.axis[1])
         elif "dense_relu" in layer:
             s_fc = getattr(build_bnn,"fc1")
