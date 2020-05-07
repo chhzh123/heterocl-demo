@@ -5,6 +5,16 @@
 #include <stdint.h>
 
 void default_function(ap_int<10> input_image[1*1*16*16], ap_uint<1> w_conv1[16*1*3*3], float bn_t1[16*16*16], ap_uint<1> w_conv2[32*16*3*3], float bn_t2[32*8*8], ap_uint<1> w_fc1[256*512], float b_fc1[256], ap_uint<1> w_fc2[10*256], float b_fc2[10], float fc2[1*10]) {
+#pragma HLS ARRAY_RESHAPE variable=input_image complete dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_conv1 complete dim=1
+#pragma HLS ARRAY_RESHAPE variable=bn_t1 block factor=256 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_conv2 block factor=256 dim=1
+#pragma HLS ARRAY_RESHAPE variable=bn_t2 block factor=256 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_fc1 block factor=256 dim=1
+#pragma HLS ARRAY_RESHAPE variable=b_fc1 block factor=256 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_fc2 block factor=256 dim=1
+#pragma HLS ARRAY_RESHAPE variable=b_fc2 complete dim=1
+#pragma HLS ARRAY_RESHAPE variable=fc2 complete dim=1
   ap_int<32> _top;
   ap_int<10> pad[324];
   for (ap_int<32> index_tuple = 0; index_tuple < 18; ++index_tuple) {

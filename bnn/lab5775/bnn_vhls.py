@@ -21,6 +21,28 @@ def add_pipeline_pad(f):
 		res_f += line + "\n"
 	return res_f
 
+def add_array_reshape(f):
+	res_f = ""
+	lines = f.split("\n")
+	for i,line in enumerate(lines):
+		if "default_function" in line:
+			break
+	pragmas = []
+	for var in ["input_image",
+				"w_conv1","bn_t1",
+				"w_conv2","bn_t2",
+				"w_fc1","b_fc1",
+				"w_fc2","b_fc2",
+				"fc2"]:
+		if var in ["bn_t1","w_conv2","bn_t2","w_fc1","b_fc1","w_fc2"]:
+			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} block factor=256 dim=1".format(var))
+		else:
+			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} complete dim=1".format(var))
+	lines = lines[:i+1] + pragmas + lines[i+1:]
+	res_f += "\n".join(lines)
+	return res_f
+
 f = add_pipeline_pad(f)
+f = add_array_reshape(f)
 with open("bnn.cpp","w") as outfile:
     outfile.write(f)
