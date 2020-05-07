@@ -54,25 +54,19 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     # print(build_bnn.__dict__.keys())
     for layer in build_bnn.__dict__.keys():
         s_layer = getattr(build_bnn,layer)
-        if "conv" in layer:
-            pass
-            # s[s_layer].pipeline(s_layer.axis[2])
-            # s[s_layer].unroll(s_layer.axis[5])
-        elif  "pool" in layer:
-            s[s_layer].pipeline(s_layer.axis[2])
-        elif "fc" in layer:
-            s[s_layer].pipeline(s_layer.axis[1])
-        elif "bn" in layer: # fuse
+        if "bn" in layer: # fuse conv
             s_conv = getattr(build_bnn,"conv" + layer[-1])
             s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
             if layer == "bn1":
-                s[s_layer].pipeline(s_layer.axis[2]) # will be refreshed
+                s[s_layer].pipeline(s_layer.axis[3]) # will be refreshed
             else:
-                s[s_layer].pipeline(s_layer.axis[3])
+                s[s_conv].pipeline(s_conv.axis[4])
+        elif  "pool" in layer:
+            s[s_layer].pipeline(s_layer.axis[3])
+        elif "fc" in layer:
+            s[s_layer].pipeline(s_layer.axis[1])
         elif "flatten" in layer:
-            s[s_layer].pipeline(s_layer.axis[0])
-            # s_pool = getattr(build_bnn,"maxpool2")
-            # s[s_pool].compute_at(s[s_layer],s_layer.axis[0])
+            s[s_layer].pipeline(s_layer.axis[1])
         elif "dense_relu" in layer:
             s_fc = getattr(build_bnn,"fc1")
             s[s_fc].compute_at(s[s_layer],s_layer.axis[1])

@@ -7,6 +7,18 @@ batch_size = 1
 
 f = build_bnn_inf(batch_size,"vhls")
 
+def add_loop_name(f):
+	lines = f.split("\n")
+	cnt = 1
+	res_f = ""
+	for i,line in enumerate(lines):
+		if line[:8] == "  ap_int" and "top" not in line:
+			res_f += "// Loop {}\n".format(cnt) + line + "\n"
+			cnt += 1
+		else:
+			res_f += line + "\n"
+	return res_f
+
 # add HLS pragmas manually
 def add_pipeline_pad(f):
 	lines = f.split("\n")
@@ -14,9 +26,12 @@ def add_pipeline_pad(f):
 	cnt = 0
 	for line in lines:
 		cnt -= 1
-		if line.strip()[:6] == "ap_int" and "pad" in line:
-			cnt = 2
-		elif cnt == 0:
+		if line.strip()[:6] == "ap_int" and ("pad" in line or "flatten" in line):
+			cnt = 3
+			name = line.strip().split()[1].split("[")[0]
+		elif cnt == 2:
+			res_f += "#pragma HLS ARRAY_RESHAPE variable={} block factor=32 dim=1\n".format(name)
+		elif cnt == 0 and name != "flatten":
 			res_f += "#pragma HLS pipeline\n"
 		res_f += line + "\n"
 	return res_f
@@ -34,14 +49,15 @@ def add_array_reshape(f):
 				"w_fc1","b_fc1",
 				"w_fc2","b_fc2",
 				"fc2"]:
-		if var in ["bn_t1","w_conv2","bn_t2","w_fc1","b_fc1","w_fc2"]:
-			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} block factor=256 dim=1".format(var))
+		if var not in ["b_fc2","fc2"]:
+			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} block factor=32 dim=1".format(var))
 		else:
 			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} complete dim=1".format(var))
 	lines = lines[:i+1] + pragmas + lines[i+1:]
 	res_f += "\n".join(lines)
 	return res_f
 
+f = add_loop_name(f)
 f = add_pipeline_pad(f)
 f = add_array_reshape(f)
 with open("bnn.cpp","w") as outfile:

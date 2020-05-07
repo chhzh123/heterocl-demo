@@ -20,3 +20,4 @@ with open(rptfile, "r") as rpt:
 outfile.write("\n")
 outfile.close()
 shutil.copyfile(rptfile,"results/{}.rpt".format(time))
+shutil.copyfile(os.path.join(prj, prj.split("/")[0]+"_prj", "solution/solution.log","results/{}.log".format(time)))
