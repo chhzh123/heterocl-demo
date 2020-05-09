@@ -28,7 +28,7 @@ def add_pipeline_pad(f):
 	cnt = 0
 	for line in lines:
 		cnt -= 1
-		if line.strip()[:6] == "ap_int" and ("pad" in line or "flatten" in line):
+		if line.strip()[:6] == "ap_uint" and ("pad" in line or "flatten" in line):
 			cnt = 3
 			name = line.strip().split()[1].split("[")[0]
 		elif cnt == 2:

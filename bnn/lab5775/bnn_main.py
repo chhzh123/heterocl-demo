@@ -6,18 +6,18 @@ target = None
 test_size = 100
 batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
-qtype_int = hcl.Int(10) # not unsigned!
-qtype_float = hcl.Float()
+qtype_int = hcl.Int(6) # not unsigned!
+qtype_float = hcl.Fixed(20,10)
 
 # compute declaration
 def build_bnn(input_image, w_conv1, bn_t1,
               w_conv2, bn_t2,
               w_fc1, b_fc1,
               w_fc2, b_fc2): # 1*16*16
-    conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1") # 16*16*16
+    conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
     bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
     maxpool1 = hlib.op.bnn.max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
-    conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2") # 32*8*8
+    conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
     maxpool2 = hlib.op.bnn.max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
     flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
@@ -35,7 +35,7 @@ params = np.load("data/bnn-5775.params.npz")
 # declare hcl placeholders
 def build_bnn_inf(batch_size=batch_size,target=target):
     hcl_ph = []
-    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_int)
+    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in params:
         dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
         hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
@@ -47,7 +47,7 @@ def build_bnn_inf(batch_size=batch_size,target=target):
 
 def build_bnn_inf_opt(batch_size=batch_size,target=target):
     hcl_ph = []
-    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_int)
+    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in params:
         dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
         hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     correct_sum = 0
     for i in range(num_images // batch_size):
         np_image = images[i*batch_size:(i+1)*batch_size]
-        hcl_image = hcl.asarray(np_image, dtype=qtype_int)
+        hcl_image = hcl.asarray(np_image, dtype=qtype_bit)
         f(hcl_image, *hcl_array, hcl_out)
         prediction = np.argmax(hcl_out.asnumpy(), axis=1)
         correct_sum += np.sum(np.equal(prediction, labels[i*batch_size:(i+1)*batch_size]))
