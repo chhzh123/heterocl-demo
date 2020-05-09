@@ -43,6 +43,18 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
+    return hcl.build(s, target=target)
+
+def build_bnn_inf_opt(batch_size=batch_size,target=target):
+    hcl_ph = []
+    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_int)
+    for name in params:
+        dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
+        hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
+
+    # build the network
+    scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
+    s = hcl.create_schedule_from_scheme(scheme)
 
     def plot_dataflow_graph():
         import matplotlib.pyplot as plt
@@ -80,7 +92,7 @@ def build_bnn_inf(batch_size=batch_size,target=target):
 
 if __name__ == '__main__':
 
-    f = build_bnn_inf()
+    f = build_bnn_inf_opt()
 
     hcl_array = []
     for name in params:

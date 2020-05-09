@@ -1,22 +1,21 @@
 import heterocl as hcl
 import hlib
 import numpy as np
+import sys
 from bnn_main import *
 
 batch_size = 1
 
-f = build_bnn_inf(batch_size,"vhls")
-
-def add_loop_label(f):
-	loop_name = ["pad","conv_bn1","maxpool1",
-				 "pad1","conv_bn2","maxpool2",
-				 "flatten","fc1","fc2"]
+def add_loop_label(f,loop_name=["pad","conv1","bn1","maxpool1",
+								"pad1","conv2","bn2","maxpool2",
+								"flatten","fc1","dense_relu",
+								"fc2"]):
 	lines = f.split("\n")
 	cnt = 0
 	res_f = ""
 	for i,line in enumerate(lines):
 		if line[:5] == "  for":
-			res_f += "{}: {}\n".format(loop_name[cnt],line.strip())
+			res_f += "LOOP_{}: {}\n".format(loop_name[cnt].upper(),line.strip())
 			cnt += 1
 		else:
 			res_f += line + "\n"
@@ -60,8 +59,17 @@ def add_array_reshape(f):
 	res_f += "\n".join(lines)
 	return res_f
 
-f = add_loop_label(f)
-f = add_pipeline_pad(f)
-f = add_array_reshape(f)
-with open("bnn.cpp","w") as outfile:
-    outfile.write(f)
+if len(sys.argv) == 1:
+	f = build_bnn_inf(batch_size,"vhls")
+	f = add_loop_label(f)
+	with open("bnn.cpp","w") as outfile:
+		outfile.write(f)
+else:
+	f = build_bnn_inf_opt(batch_size,"vhls")
+	f = add_loop_label(f, ["pad","conv_bn1","maxpool1",
+				 		   "pad1","conv_bn2","maxpool2",
+						   "flatten","fc1","fc2"])
+	f = add_pipeline_pad(f)
+	f = add_array_reshape(f)
+	with open("bnn.cpp","w") as outfile:
+		outfile.write(f)
