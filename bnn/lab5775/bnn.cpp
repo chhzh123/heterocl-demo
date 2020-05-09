@@ -5,19 +5,19 @@
 #include <stdint.h>
 
 void default_function(ap_int<10> input_image[1*1*16*16], ap_uint<1> w_conv1[16*1*3*3], float bn_t1[16*16*16], ap_uint<1> w_conv2[32*16*3*3], float bn_t2[32*8*8], ap_uint<1> w_fc1[256*512], float b_fc1[256], ap_uint<1> w_fc2[10*256], float b_fc2[10], float fc2[1*10]) {
-#pragma HLS ARRAY_RESHAPE variable=input_image block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_conv1 block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=bn_t1 block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_conv2 block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=bn_t2 block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_fc1 block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=b_fc1 block factor=32 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_fc2 block factor=32 dim=1
+#pragma HLS ARRAY_RESHAPE variable=input_image block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_conv1 block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=bn_t1 block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_conv2 block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=bn_t2 block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_fc1 block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=b_fc1 block factor=8 dim=1
+#pragma HLS ARRAY_RESHAPE variable=w_fc2 block factor=8 dim=1
 #pragma HLS ARRAY_RESHAPE variable=b_fc2 complete dim=1
 #pragma HLS ARRAY_RESHAPE variable=fc2 complete dim=1
   ap_int<32> _top;
   ap_int<10> pad[324];
-#pragma HLS ARRAY_RESHAPE variable=pad block factor=32 dim=1
+#pragma HLS ARRAY_RESHAPE variable=pad block factor=8 dim=1
 LOOP_PAD: for (ap_int<32> index_tuple = 0; index_tuple < 18; ++index_tuple) {
     for (ap_int<32> i = 0; i < 18; ++i) {
 #pragma HLS pipeline
@@ -46,8 +46,8 @@ LOOP_CONV_BN1: for (ap_int<32> c = 0; c < 16; ++c) {
 LOOP_MAXPOOL1: for (ap_int<32> i1 = 0; i1 < 1; ++i1) {
     for (ap_int<32> c1 = 0; c1 < 16; ++c1) {
       for (ap_int<32> h1 = 0; h1 < 8; ++h1) {
+      #pragma HLS pipeline
         for (ap_int<32> w1 = 0; w1 < 8; ++w1) {
-        #pragma HLS pipeline
           ap_int<10> reducer4;
           reducer4 = (ap_int<10>)-512;
           for (ap_int<32> ra6 = 0; ra6 < 2; ++ra6) {
@@ -61,7 +61,7 @@ LOOP_MAXPOOL1: for (ap_int<32> i1 = 0; i1 < 1; ++i1) {
     }
   }
   ap_int<10> pad1[1600];
-#pragma HLS ARRAY_RESHAPE variable=pad1 block factor=32 dim=1
+#pragma HLS ARRAY_RESHAPE variable=pad1 block factor=8 dim=1
 LOOP_PAD1: for (ap_int<32> not_zero = 0; not_zero < 16; ++not_zero) {
     for (ap_int<32> index_tuple1 = 0; index_tuple1 < 10; ++index_tuple1) {
 #pragma HLS pipeline
@@ -94,8 +94,8 @@ LOOP_CONV_BN2: for (ap_int<32> c2 = 0; c2 < 32; ++c2) {
 LOOP_MAXPOOL2: for (ap_int<32> i3 = 0; i3 < 1; ++i3) {
     for (ap_int<32> c3 = 0; c3 < 32; ++c3) {
       for (ap_int<32> h3 = 0; h3 < 4; ++h3) {
+      #pragma HLS pipeline
         for (ap_int<32> w3 = 0; w3 < 4; ++w3) {
-        #pragma HLS pipeline
           ap_int<10> reducer5;
           reducer5 = (ap_int<10>)-512;
           for (ap_int<32> ra8 = 0; ra8 < 2; ++ra8) {
@@ -109,7 +109,7 @@ LOOP_MAXPOOL2: for (ap_int<32> i3 = 0; i3 < 1; ++i3) {
     }
   }
   ap_int<10> flatten[512];
-#pragma HLS ARRAY_RESHAPE variable=flatten block factor=32 dim=1
+#pragma HLS ARRAY_RESHAPE variable=flatten block factor=8 dim=1
 LOOP_FLATTEN: for (ap_int<32> i4 = 0; i4 < 1; ++i4) {
     for (ap_int<32> j = 0; j < 512; ++j) {
     #pragma HLS pipeline
@@ -119,11 +119,11 @@ LOOP_FLATTEN: for (ap_int<32> i4 = 0; i4 < 1; ++i4) {
   ap_int<10> dense_relu[256];
 LOOP_FC1: for (ap_int<32> i5 = 0; i5 < 1; ++i5) {
     for (ap_int<32> j1 = 0; j1 < 256; ++j1) {
-    #pragma HLS pipeline
       float fc1;
       float reducer6;
       reducer6 = 0.000000e+00f;
       for (ap_int<32> ra10 = 0; ra10 < 512; ++ra10) {
+      #pragma HLS pipeline
         reducer6 = (((float)(flatten[(ra10 + (i5 * 512))] == ((ap_int<10>)w_fc1[(ra10 + (j1 * 512))]))) + reducer6);
       }
       fc1 = (((reducer6 * 1.250000e-01f) + b_fc1[j1]) + -3.200000e+01f);
@@ -132,10 +132,10 @@ LOOP_FC1: for (ap_int<32> i5 = 0; i5 < 1; ++i5) {
   }
 LOOP_FC2: for (ap_int<32> i6 = 0; i6 < 1; ++i6) {
     for (ap_int<32> j2 = 0; j2 < 10; ++j2) {
-    #pragma HLS pipeline
       float reducer7;
       reducer7 = 0.000000e+00f;
       for (ap_int<32> ra11 = 0; ra11 < 256; ++ra11) {
+      #pragma HLS pipeline
         reducer7 = (((float)(dense_relu[(ra11 + (i6 * 256))] == ((ap_int<10>)w_fc2[(ra11 + (j2 * 256))]))) + reducer7);
       }
       fc2[(j2 + (i6 * 10))] = (((reducer7 * 1.767767e-01f) + b_fc2[j2]) + -2.262742e+01f);

@@ -32,7 +32,7 @@ def add_pipeline_pad(f):
 			cnt = 3
 			name = line.strip().split()[1].split("[")[0]
 		elif cnt == 2:
-			res_f += "#pragma HLS ARRAY_RESHAPE variable={} block factor=32 dim=1\n".format(name)
+			res_f += "#pragma HLS ARRAY_RESHAPE variable={} block factor=8 dim=1\n".format(name)
 		elif cnt == 0 and name != "flatten":
 			res_f += "#pragma HLS pipeline\n"
 		res_f += line + "\n"
@@ -52,7 +52,7 @@ def add_array_reshape(f):
 				"w_fc2","b_fc2",
 				"fc2"]:
 		if var not in ["b_fc2","fc2"]:
-			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} block factor=32 dim=1".format(var))
+			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} block factor=8 dim=1".format(var))
 		else:
 			pragmas.append("#pragma HLS ARRAY_RESHAPE variable={} complete dim=1".format(var))
 	lines = lines[:i+1] + pragmas + lines[i+1:]
