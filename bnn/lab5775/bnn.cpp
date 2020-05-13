@@ -5,26 +5,29 @@
 #include <stdint.h>
 
 void default_function(ap_uint<1> input_image[1*1*16*16], ap_uint<1> w_conv1[16*1*3*3], ap_fixed<20, 10> bn_t1[16*16*16], ap_uint<1> w_conv2[32*16*3*3], ap_fixed<20, 10> bn_t2[32*8*8], ap_uint<1> w_fc1[256*512], ap_fixed<20, 10> b_fc1[256], ap_uint<1> w_fc2[10*256], ap_fixed<20, 10> b_fc2[10], ap_fixed<20, 10> fc2[1*10]) {
-#pragma HLS ARRAY_RESHAPE variable=input_image block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_conv1 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=bn_t1 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_conv2 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=bn_t2 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_fc1 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=b_fc1 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=w_fc2 block factor=8 dim=1
-#pragma HLS ARRAY_RESHAPE variable=b_fc2 complete dim=1
-#pragma HLS ARRAY_RESHAPE variable=fc2 complete dim=1
+  #pragma HLS array_partition variable=w_conv1 block dim=1 factor=8
+  #pragma HLS array_partition variable=bn_t1 block dim=1 factor=8
+  #pragma HLS array_partition variable=w_conv2 block dim=1 factor=8
+  #pragma HLS array_partition variable=bn_t2 block dim=1 factor=8
+  #pragma HLS array_partition variable=w_fc1 block dim=1 factor=8
+  #pragma HLS array_partition variable=b_fc1 block dim=1 factor=8
+  #pragma HLS array_partition variable=w_fc2 block dim=1 factor=8
+  #pragma HLS array_partition variable=b_fc2 complete dim=1
+  #pragma HLS array_partition variable=input_image block dim=1 factor=8
   ap_int<32> _top;
   ap_uint<1> pad[324];
+#pragma HLS array_partition variable=pad block factor=8 dim=1
 LOOP_PAD: for (ap_int<32> index_tuple = 0; index_tuple < 18; ++index_tuple) {
     for (ap_int<32> i = 0; i < 18; ++i) {
+#pragma HLS pipeline
       pad[(i + (index_tuple * 18))] = (((((1 <= index_tuple) && (index_tuple < 17)) && (1 <= i)) && (i < 17)) ? ((ap_uint<1>)input_image[((i + (index_tuple * 16)) + -17)]) : ((ap_uint<1>)0));
     }
   }
   ap_uint<1> bn1[4096];
+#pragma HLS array_partition variable=bn1 block factor=8 dim=1
 LOOP_CONV_BN1: for (ap_int<32> c = 0; c < 16; ++c) {
     for (ap_int<32> h = 0; h < 16; ++h) {
+#pragma HLS pipeline
       for (ap_int<32> w = 0; w < 16; ++w) {
       #pragma HLS pipeline
         ap_int<6> conv1;
@@ -32,7 +35,7 @@ LOOP_CONV_BN1: for (ap_int<32> c = 0; c < 16; ++c) {
         sum = (ap_int<6>)0;
         for (ap_int<32> ry = 0; ry < 3; ++ry) {
           for (ap_int<32> rx = 0; rx < 3; ++rx) {
-            sum = ((ap_int<6>)(((ap_int<34>)(((((((ap_int<33>)1 - ((ap_int<33>)rx)) <= ((ap_int<33>)w)) && (((ap_int<33>)w) < ((ap_int<33>)17 - ((ap_int<33>)rx)))) && (((ap_int<33>)1 - ((ap_int<33>)ry)) <= ((ap_int<33>)h))) && (((ap_int<33>)h) < ((ap_int<33>)17 - ((ap_int<33>)ry)))) ? ((ap_uint<32>)((((ap_uint<32>)(pad[((w + rx) + ((h + ry) * 18))] == w_conv1[((rx + (ry * 3)) + (c * 9))])) * 2U) - 1U)) : (0U))) + ((ap_int<34>)sum)));
+            sum = ((ap_int<6>)(((ap_int<34>)(((((((ap_int<33>)1 - ((ap_int<33>)rx)) <= ((ap_int<33>)w)) && (((ap_int<33>)w) < ((ap_int<33>)17 - ((ap_int<33>)rx)))) && (((ap_int<33>)1 - ((ap_int<33>)ry)) <= ((ap_int<33>)h))) && (((ap_int<33>)h) < ((ap_int<33>)17 - ((ap_int<33>)ry)))) ? ((ap_uint<32>)((((ap_uint<32>)(pad[((w + rx) + ((h + ry) * 18))] == w_conv1[((rx + (ry * 3)) + (c * 9))])) * 2U) - 1U)) : (ap_uint<32>)(0U))) + ((ap_int<34>)sum)));
           }
         }
         conv1 = sum;
@@ -41,8 +44,10 @@ LOOP_CONV_BN1: for (ap_int<32> c = 0; c < 16; ++c) {
     }
   }
   ap_uint<1> maxpool1[1024];
+#pragma HLS array_partition variable=maxpool1 block factor=8 dim=1
 LOOP_MAXPOOL1: for (ap_int<32> i1 = 0; i1 < 1; ++i1) {
     for (ap_int<32> c1 = 0; c1 < 16; ++c1) {
+#pragma HLS pipeline
       for (ap_int<32> h1 = 0; h1 < 8; ++h1) {
       #pragma HLS pipeline
         for (ap_int<32> w1 = 0; w1 < 8; ++w1) {
@@ -59,16 +64,20 @@ LOOP_MAXPOOL1: for (ap_int<32> i1 = 0; i1 < 1; ++i1) {
     }
   }
   ap_uint<1> pad1[1600];
+#pragma HLS array_partition variable=pad1 block factor=8 dim=1
 LOOP_PAD1: for (ap_int<32> not_zero = 0; not_zero < 16; ++not_zero) {
     for (ap_int<32> index_tuple1 = 0; index_tuple1 < 10; ++index_tuple1) {
+#pragma HLS pipeline
       for (ap_int<32> i2 = 0; i2 < 10; ++i2) {
         pad1[((i2 + (index_tuple1 * 10)) + (not_zero * 100))] = (((((1 <= index_tuple1) && (index_tuple1 < 9)) && (1 <= i2)) && (i2 < 9)) ? ((ap_uint<1>)maxpool1[(((i2 + (index_tuple1 * 8)) + (not_zero * 64)) + -9)]) : ((ap_uint<1>)0));
       }
     }
   }
   ap_uint<1> bn2[2048];
+#pragma HLS array_partition variable=bn2 block factor=8 dim=1
 LOOP_CONV_BN2: for (ap_int<32> c2 = 0; c2 < 32; ++c2) {
     for (ap_int<32> h2 = 0; h2 < 8; ++h2) {
+#pragma HLS pipeline
       for (ap_int<32> w2 = 0; w2 < 8; ++w2) {
         ap_int<6> conv2;
         ap_int<6> sum1;
@@ -77,7 +86,7 @@ LOOP_CONV_BN2: for (ap_int<32> c2 = 0; c2 < 32; ++c2) {
         #pragma HLS pipeline
           for (ap_int<32> ry1 = 0; ry1 < 3; ++ry1) {
             for (ap_int<32> rx1 = 0; rx1 < 3; ++rx1) {
-              sum1 = ((ap_int<6>)(((ap_int<34>)(((((((ap_int<33>)1 - ((ap_int<33>)rx1)) <= ((ap_int<33>)w2)) && (((ap_int<33>)w2) < ((ap_int<33>)9 - ((ap_int<33>)rx1)))) && (((ap_int<33>)1 - ((ap_int<33>)ry1)) <= ((ap_int<33>)h2))) && (((ap_int<33>)h2) < ((ap_int<33>)9 - ((ap_int<33>)ry1)))) ? ((ap_uint<32>)((((ap_uint<32>)(pad1[(((w2 + rx1) + ((h2 + ry1) * 10)) + (rc * 100))] == w_conv2[(((rx1 + (ry1 * 3)) + (rc * 9)) + (c2 * 144))])) * 2U) - 1U)) : (0U))) + ((ap_int<34>)sum1)));
+              sum1 = ((ap_int<6>)(((ap_int<34>)(((((((ap_int<33>)1 - ((ap_int<33>)rx1)) <= ((ap_int<33>)w2)) && (((ap_int<33>)w2) < ((ap_int<33>)9 - ((ap_int<33>)rx1)))) && (((ap_int<33>)1 - ((ap_int<33>)ry1)) <= ((ap_int<33>)h2))) && (((ap_int<33>)h2) < ((ap_int<33>)9 - ((ap_int<33>)ry1)))) ? ((ap_uint<32>)((((ap_uint<32>)(pad1[(((w2 + rx1) + ((h2 + ry1) * 10)) + (rc * 100))] == w_conv2[(((rx1 + (ry1 * 3)) + (rc * 9)) + (c2 * 144))])) * 2U) - 1U)) : (ap_uint<32>)(0U))) + ((ap_int<34>)sum1)));
             }
           }
         }
@@ -87,8 +96,10 @@ LOOP_CONV_BN2: for (ap_int<32> c2 = 0; c2 < 32; ++c2) {
     }
   }
   ap_uint<1> maxpool2[512];
+#pragma HLS array_partition variable=maxpool2 block factor=8 dim=1
 LOOP_MAXPOOL2: for (ap_int<32> i3 = 0; i3 < 1; ++i3) {
     for (ap_int<32> c3 = 0; c3 < 32; ++c3) {
+#pragma HLS pipeline
       for (ap_int<32> h3 = 0; h3 < 4; ++h3) {
       #pragma HLS pipeline
         for (ap_int<32> w3 = 0; w3 < 4; ++w3) {
@@ -105,6 +116,7 @@ LOOP_MAXPOOL2: for (ap_int<32> i3 = 0; i3 < 1; ++i3) {
     }
   }
   ap_uint<1> flatten[512];
+#pragma HLS array_partition variable=flatten block factor=8 dim=1
 LOOP_FLATTEN: for (ap_int<32> i4 = 0; i4 < 1; ++i4) {
     for (ap_int<32> j = 0; j < 512; ++j) {
     #pragma HLS pipeline
@@ -112,8 +124,10 @@ LOOP_FLATTEN: for (ap_int<32> i4 = 0; i4 < 1; ++i4) {
     }
   }
   ap_uint<1> dense_relu[256];
+#pragma HLS array_partition variable=dense_relu block factor=8 dim=1
 LOOP_FC1: for (ap_int<32> i5 = 0; i5 < 1; ++i5) {
     for (ap_int<32> j1 = 0; j1 < 256; ++j1) {
+#pragma HLS pipeline
       ap_fixed<20, 10> fc1;
       ap_fixed<20, 10> reducer6;
       reducer6 = ((ap_fixed<20, 10>)0);

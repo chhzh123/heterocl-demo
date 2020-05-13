@@ -63,7 +63,15 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
         nx.draw(graph, with_labels=True)
         plt.savefig("bnn.png")
 
-    # print(build_bnn.__dict__.keys())
+    # memory optimization
+    s.partition(input_image, hcl.Partition.Block, dim=1, factor=8)
+    for ph in reversed(hcl_ph):
+        if ph.name in ["b_fc2", "fc2"]:
+            s.partition(ph, hcl.Partition.Complete, dim=1)
+        else:
+            s.partition(ph, hcl.Partition.Block, dim=1, factor=8)
+
+    # compute optimization
     for layer in build_bnn.__dict__.keys():
         s_layer = getattr(build_bnn,layer)
         if "bn" in layer: # fuse conv
