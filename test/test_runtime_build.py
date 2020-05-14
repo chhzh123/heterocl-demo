@@ -4,8 +4,8 @@ import os
 import numpy as np
 
 def test_vivado_hls():
-    if os.system("which vivado_hls >> /dev/null") != 0:
-        return 
+    # if os.system("which vivado_hls >> /dev/null") != 0:
+    #     return 
 
     hcl.init()
     A = hcl.placeholder((10, 32), "A")
@@ -17,8 +17,8 @@ def test_vivado_hls():
     
     target = hcl.platform.zc706
     s = hcl.create_schedule([A], kernel)
-    # s.to(kernel.B, target.xcel)
-    # s.to(kernel.C, target.host)
+    s.to(kernel.B, target.xcel)
+    s.to(kernel.C, target.host)
     target.config(compile="vivado_hls", mode="sw_sim")
     f = hcl.build(s, target)
 
