@@ -8,6 +8,7 @@ batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(6) # not unsigned!
 qtype_float = hcl.Fixed(20,10)
+qtype_packed = hcl.UInt(32)
 
 # compute declaration
 def build_bnn(input_image, w_conv1, bn_t1,
@@ -25,12 +26,44 @@ def build_bnn(input_image, w_conv1, bn_t1,
     fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256->10
     return fc2
 
+def build_bnn_packed(input_image, w_conv1, bn_t1,
+                     w_conv2, bn_t2,
+                     w_fc1, b_fc1,
+                     w_fc2, b_fc2): # 1*16*16
+    conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
+    bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
+    maxpool1 = hlib.op.bnn.max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+    conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+    bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
+    maxpool2 = hlib.op.bnn.max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
+    pack = hcl.pack(flat, axis=1, factor=32, dtype=qtype_packed, name="pack") # 512/32=16
+    fc1 = hlib.op.bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512->256
+    pack2 = hcl.pack(fc1, axis=1, factor=32, dtype=qtype_packed, name="pack2")
+    fc2 = hlib.op.bnn.packed_dense(pack2, w_fc2, b_fc2, False, name="fc2") # 256->10
+    return fc2
+
+def packbits(arr, bitwidth):
+    assert arr.dtype == np.bool, \
+        "A bool array is needed"
+    return np.packbits(arr,axis=1,bitorder="little").view(np.uint32)
+
 # prepare numpy arrays for testing
 data = np.load("data/bnn-5775.data.npz")
 images = data["images"][:test_size]
 labels = data["labels"][:test_size]
 num_images = images.shape[0]
 params = np.load("data/bnn-5775.params.npz")
+
+# prepare packed arrays
+# packed_images = packbits(images.astype(np.bool),32)
+# packed_labels = packbits(labels.astype(np.bool),32)
+packed_params = {}
+for name in params:
+    if "w_fc" in name:
+        packed_params[name] = packbits(params[name].copy().astype(np.bool),32)
+    else:
+        packed_params[name] = params[name].copy()
 
 # declare hcl placeholders
 def build_bnn_inf(batch_size=batch_size,target=target):
@@ -93,15 +126,36 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_fc].pipeline(s_fc.axis[2])
     return hcl.build(s, target=target)
 
+def build_bnn_inf_bitpacked(batch_size=batch_size,target=target):
+    # prepare placeholder
+    hcl_ph = []
+    input_image = hcl.placeholder(images.shape,"input_image",qtype_bit)
+    for name in packed_params:
+        dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+        hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
+
+    # build the network
+    scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn_packed)
+    s = hcl.create_schedule_from_scheme(scheme)
+    return hcl.build(s, target=target)
+
 if __name__ == '__main__':
 
-    f = build_bnn_inf_opt()
+    f = build_bnn_inf_bitpacked()
 
-    hcl_array = []
-    for name in params:
-        dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
-        hcl_array.append(hcl.asarray(params[name],dtype=dtype))
-    hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+    if False:
+        hcl_array = []
+        for name in params:
+            dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
+            hcl_array.append(hcl.asarray(params[name],dtype=dtype))
+        hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+    else:
+        hcl_array = []
+        for name in packed_params:
+            dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+            hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
+        hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+        # hcl_out = hcl.asarray(np.zeros((batch_size,10)),dtype=qtype_packed)
 
     correct_sum = 0
     for i in range(num_images // batch_size):
