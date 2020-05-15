@@ -64,7 +64,7 @@ if len(sys.argv) == 1:
 	f = add_loop_label(f)
 	with open("bnn.cpp","w") as outfile:
 		outfile.write(f)
-else:
+elif sys.argv[1] == "2":
 	f = build_bnn_inf_opt(batch_size,"vhls")
 	f = add_loop_label(f, ["pad","conv_bn1","maxpool1",
 				 		   "pad1","conv_bn2","maxpool2",
@@ -74,5 +74,10 @@ else:
 	print(len(f_lst))
 	f = '(ap_uint<32>)(0U)'.join(f_lst)
 	# f = add_array_partition(f)
+	with open("bnn.cpp","w") as outfile:
+		outfile.write(f)
+else:
+	f = build_bitpacked_bnn_inf(batch_size,"vhls")
+	# f = add_loop_label(f)
 	with open("bnn.cpp","w") as outfile:
 		outfile.write(f)

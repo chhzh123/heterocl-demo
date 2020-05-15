@@ -26,6 +26,8 @@ def build_bnn(input_image, w_conv1, bn_t1,
     fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256->10
     return fc2
 
+counts = hcl.array(np.array(list(bytes(bin(i).count("1") for i in range(256)))))
+
 def build_bnn_packed(input_image, w_conv1, bn_t1,
                      w_conv2, bn_t2,
                      w_fc1, b_fc1,
@@ -126,7 +128,7 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_fc].pipeline(s_fc.axis[2])
     return hcl.build(s, target=target)
 
-def build_bnn_inf_bitpacked(batch_size=batch_size,target=target):
+def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     # prepare placeholder
     hcl_ph = []
     input_image = hcl.placeholder(images.shape,"input_image",qtype_bit)
@@ -141,7 +143,7 @@ def build_bnn_inf_bitpacked(batch_size=batch_size,target=target):
 
 if __name__ == '__main__':
 
-    f = build_bnn_inf_bitpacked()
+    f = build_bitpacked_bnn_inf()
 
     if False:
         hcl_array = []
