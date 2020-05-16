@@ -28,16 +28,20 @@ def build_bnn(input_image, w_conv1, bn_t1,
 
 counts = hcl.array(np.array(list(bytes(bin(i).count("1") for i in range(256)))))
 
-def build_bnn_packed(input_image, w_conv1, bn_t1,
+def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_conv2, bn_t2,
                      w_fc1, b_fc1,
                      w_fc2, b_fc2): # 1*16*16
     conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
     bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    maxpool1 = hlib.op.bnn.max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+    packed_bn1 = hcl.pack(bn1, axis=3, bitorder="little", dtype=hcl.UInt(8), name="packed_bn1") # 16*8*1
+    maxpool1 = hlib.op.bnn.packed_max_pool2d_nchw(packed_bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+
     conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
-    maxpool2 = hlib.op.bnn.max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    packed_bn2 = hcl.pack(bn2, axis=3, bitorder="little", dtype=hcl.UInt(8), name="packed_bn2") # 32*8*1
+    maxpool2 = hlib.op.bnn.packed_max_pool2d_nchw(packed_bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+
     flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
     pack = hcl.pack(flat, axis=1, factor=32, dtype=qtype_packed, name="pack") # 512/32=16
     fc1 = hlib.op.bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512->256
@@ -137,7 +141,7 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
         hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
 
     # build the network
-    scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn_packed)
+    scheme = hcl.create_scheme([input_image] + hcl_ph, build_packed_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
     return hcl.build(s, target=target)
 
