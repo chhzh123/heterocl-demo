@@ -1,7 +1,6 @@
 import heterocl as hcl
 import hlib
 import numpy as np
-
 target = None
 test_size = 100
 batch_size = 100
@@ -34,12 +33,12 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_fc2, b_fc2): # 1*16*16
     conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
     bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    packed_bn1 = hcl.pack(bn1, axis=3, bitorder="little", dtype=hcl.UInt(8), name="packed_bn1") # 16*8*1
+    packed_bn1 = hcl.pack(bn1, axis=1, factor=16, dtype=hcl.UInt(16), name="packed_bn1") # 1*8*8
     maxpool1 = hlib.op.bnn.packed_max_pool2d_nchw(packed_bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
 
     conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
-    packed_bn2 = hcl.pack(bn2, axis=3, bitorder="little", dtype=hcl.UInt(8), name="packed_bn2") # 32*8*1
+    packed_bn2 = hcl.pack(bn2, axis=1, factor=32, dtype=qtype_packed, name="packed_bn2") # 1*8*8
     maxpool2 = hlib.op.bnn.packed_max_pool2d_nchw(packed_bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
 
     flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
