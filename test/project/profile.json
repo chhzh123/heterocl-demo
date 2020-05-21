@@ -1,0 +1,404 @@
+{
+  "ReportVersion": {
+    "Version": "2018.2"
+  },
+  "UserAssignments": {
+    "unit": "ns",
+    "ProductFamily": "zynq",
+    "Part": "xc7z020clg484-1",
+    "TopModelName": "test",
+    "TargetClockPeriod": "10.00",
+    "ClockUncertainty": "1.25"
+  },
+  "PerformanceEstimates": {
+    "PipelineType": "none",
+    "SummaryOfTimingAnalysis": {
+      "unit": "ns",
+      "EstimatedClockPeriod": "5.806"
+    },
+    "SummaryOfOverallLatency": {
+      "unit": "clock cycles",
+      "Best-caseLatency": "2623",
+      "Average-caseLatency": "2623",
+      "Worst-caseLatency": "2623",
+      "Interval-min": "2624",
+      "Interval-max": "2624"
+    },
+    "SummaryOfLoopLatency": {
+      "Loop1": {
+        "TripCount": "10",
+        "Latency": "660",
+        "IterationLatency": "66",
+        "Loop1.1": {
+          "TripCount": "32",
+          "Latency": "64",
+          "IterationLatency": "2"
+        }
+      },
+      "Loop2": {
+        "TripCount": "10",
+        "Latency": "980",
+        "IterationLatency": "98",
+        "Loop2.1": {
+          "TripCount": "32",
+          "Latency": "96",
+          "IterationLatency": "3"
+        }
+      },
+      "Loop3": {
+        "TripCount": "10",
+        "Latency": "980",
+        "IterationLatency": "98",
+        "Loop3.1": {
+          "TripCount": "32",
+          "Latency": "96",
+          "IterationLatency": "3"
+        }
+      }
+    }
+  },
+  "AreaEstimates": {
+    "Resources": {
+      "BRAM_18K": "2",
+      "FF": "306",
+      "LUT": "498",
+      "DSP48E": "0"
+    },
+    "AvailableResources": {
+      "BRAM_18K": "280",
+      "DSP48E": "220",
+      "FF": "106400",
+      "LUT": "53200"
+    }
+  },
+  "InterfaceSummary": {
+    "RtlPorts": [
+      {
+        "name": "s_axi_control_AWVALID",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_AWREADY",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_AWADDR",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "4",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_WVALID",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_WREADY",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_WDATA",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "32",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_WSTRB",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "4",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_ARVALID",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_ARREADY",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_ARADDR",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "4",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_RVALID",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_RREADY",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_RDATA",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "32",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_RRESP",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "2",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_BVALID",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_BREADY",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "s_axi_control_BRESP",
+        "Object": "control",
+        "Type": "return void",
+        "Scope": null,
+        "IOProtocol": "s_axi",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "2",
+        "Attribute": "unknown",
+        "CType": "unknown",
+        "HasCtrl": "1"
+      },
+      {
+        "name": "ap_clk",
+        "Object": "test",
+        "Type": "return value",
+        "Scope": null,
+        "IOProtocol": "ap_ctrl_hs",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "control"
+      },
+      {
+        "name": "ap_rst_n",
+        "Object": "test",
+        "Type": "return value",
+        "Scope": null,
+        "IOProtocol": "ap_ctrl_hs",
+        "IOConfig": null,
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "control"
+      },
+      {
+        "name": "interrupt",
+        "Object": "test",
+        "Type": "return value",
+        "Scope": null,
+        "IOProtocol": "ap_ctrl_hs",
+        "IOConfig": null,
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "unknown"
+      },
+      {
+        "name": "gmem0_V_V_TDATA",
+        "Object": "gmem0_V_V",
+        "Type": "pointer",
+        "Scope": null,
+        "IOProtocol": "axis",
+        "IOConfig": "register, both mode",
+        "Dir": "in",
+        "Bits": "32",
+        "Attribute": "data",
+        "CType": "int"
+      },
+      {
+        "name": "gmem0_V_V_TVALID",
+        "Object": "gmem0_V_V",
+        "Type": "pointer",
+        "Scope": null,
+        "IOProtocol": "axis",
+        "IOConfig": "register, both mode",
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "control",
+        "CType": "int"
+      },
+      {
+        "name": "gmem0_V_V_TREADY",
+        "Object": "gmem0_V_V",
+        "Type": "pointer",
+        "Scope": null,
+        "IOProtocol": "axis",
+        "IOConfig": "register, both mode",
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "control",
+        "CType": "int"
+      },
+      {
+        "name": "gmem1_V_V_TDATA",
+        "Object": "gmem1_V_V",
+        "Type": "pointer",
+        "Scope": null,
+        "IOProtocol": "axis",
+        "IOConfig": "register, both mode",
+        "Dir": "out",
+        "Bits": "32",
+        "Attribute": "data",
+        "CType": "int"
+      },
+      {
+        "name": "gmem1_V_V_TVALID",
+        "Object": "gmem1_V_V",
+        "Type": "pointer",
+        "Scope": null,
+        "IOProtocol": "axis",
+        "IOConfig": "register, both mode",
+        "Dir": "out",
+        "Bits": "1",
+        "Attribute": "control",
+        "CType": "int"
+      },
+      {
+        "name": "gmem1_V_V_TREADY",
+        "Object": "gmem1_V_V",
+        "Type": "pointer",
+        "Scope": null,
+        "IOProtocol": "axis",
+        "IOConfig": "register, both mode",
+        "Dir": "in",
+        "Bits": "1",
+        "Attribute": "control",
+        "CType": "int"
+      }
+    ]
+  }
+}
