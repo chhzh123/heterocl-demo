@@ -2,7 +2,7 @@ import heterocl as hcl
 import hlib.op.bnn as bnn
 import numpy as np
 
-target = hcl.platform.zc706 # None
+target = None
 test_size = 100
 batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
@@ -82,10 +82,12 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
-    if target != None:
+
+    if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
         s.to(build_bnn.fc2, target.host)
         target.config(compile="vivado_hls", mode="csyn")
+
     return hcl.build(s, target=target)
 
 def build_bnn_inf_opt(batch_size=batch_size,target=target):
@@ -106,14 +108,6 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
         nx.draw(graph, with_labels=True)
         plt.savefig("bnn.png")
 
-    # memory optimization
-    s.partition(input_image, hcl.Partition.Block, dim=1, factor=8)
-    for ph in reversed(hcl_ph):
-        if ph.name in ["b_fc2", "fc2"]:
-            s.partition(ph, hcl.Partition.Complete, dim=1)
-        else:
-            s.partition(ph, hcl.Partition.Block, dim=1, factor=8)
-
     # compute optimization
     for layer in build_bnn.__dict__.keys():
         s_layer = getattr(build_bnn,layer)
@@ -127,13 +121,27 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
         elif "pool" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
         elif "fc" in layer:
-            s[s_layer].pipeline(s_layer.axis[2])
+            s[s_layer].pipeline(s_layer.axis[1])
         elif "flatten" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif "dense_relu" in layer:
             s_fc = getattr(build_bnn,"fc1")
             s[s_fc].compute_at(s[s_layer],s_layer.axis[1])
             s[s_fc].pipeline(s_fc.axis[2])
+
+    if isinstance(target,hcl.platform):
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_bnn.fc2, target.host)
+        target.config(compile="vivado_hls", mode="csyn")
+
+    # memory optimization
+    s.partition(input_image, hcl.Partition.Block, dim=1, factor=8)
+    for ph in reversed(hcl_ph):
+        if ph.name in ["b_fc2", "fc2"]:
+            s.partition(ph, hcl.Partition.Complete, dim=1)
+        else:
+            s.partition(ph, hcl.Partition.Block, dim=1, factor=8)
+
     return hcl.build(s, target=target)
 
 def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):

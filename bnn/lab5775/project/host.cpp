@@ -18,9 +18,9 @@
 #include "kernel.h"
 
 int main(int argc, char ** argv) {
-  uint8_t* arg_0 = (uint8_t*)shmat(12025880, nullptr, 0);
-  uint8_t* input_image = new uint8_t[100 * 1 * 16 * 16];
-  for (size_t i0 = 0; i0 < 100; i0++) {
+  uint8_t* arg_0 = (uint8_t*)shmat(13860888, nullptr, 0);
+  uint8_t* input_image = new uint8_t[1 * 1 * 16 * 16];
+  for (size_t i0 = 0; i0 < 1; i0++) {
     for (size_t i1 = 0; i1 < 1; i1++) {
       for (size_t i2 = 0; i2 < 16; i2++) {
         for (size_t i3 = 0; i3 < 16; i3++) {
@@ -30,7 +30,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  uint8_t* arg_1 = (uint8_t*)shmat(12058653, nullptr, 0);
+  uint8_t* arg_1 = (uint8_t*)shmat(13893661, nullptr, 0);
   uint8_t* w_conv1 = new uint8_t[16 * 1 * 3 * 3];
   for (size_t i0 = 0; i0 < 16; i0++) {
     for (size_t i1 = 0; i1 < 1; i1++) {
@@ -42,7 +42,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_2 = (int32_t*)shmat(12091424, nullptr, 0);
+  int32_t* arg_2 = (int32_t*)shmat(13926432, nullptr, 0);
   int32_t* bn_t1 = new int32_t[16 * 16 * 16];
   for (size_t i0 = 0; i0 < 16; i0++) {
     for (size_t i1 = 0; i1 < 16; i1++) {
@@ -52,7 +52,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  uint8_t* arg_3 = (uint8_t*)shmat(12124196, nullptr, 0);
+  uint8_t* arg_3 = (uint8_t*)shmat(13959204, nullptr, 0);
   uint8_t* w_conv2 = new uint8_t[32 * 16 * 3 * 3];
   for (size_t i0 = 0; i0 < 32; i0++) {
     for (size_t i1 = 0; i1 < 16; i1++) {
@@ -64,7 +64,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_4 = (int32_t*)shmat(12156966, nullptr, 0);
+  int32_t* arg_4 = (int32_t*)shmat(13991974, nullptr, 0);
   int32_t* bn_t2 = new int32_t[32 * 8 * 8];
   for (size_t i0 = 0; i0 < 32; i0++) {
     for (size_t i1 = 0; i1 < 8; i1++) {
@@ -74,7 +74,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  uint8_t* arg_5 = (uint8_t*)shmat(12189736, nullptr, 0);
+  uint8_t* arg_5 = (uint8_t*)shmat(14024744, nullptr, 0);
   uint8_t* w_fc1 = new uint8_t[256 * 512];
   for (size_t i0 = 0; i0 < 256; i0++) {
     for (size_t i1 = 0; i1 < 512; i1++) {
@@ -82,13 +82,13 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_6 = (int32_t*)shmat(12222505, nullptr, 0);
+  int32_t* arg_6 = (int32_t*)shmat(14057513, nullptr, 0);
   int32_t* b_fc1 = new int32_t[256];
   for (size_t i0 = 0; i0 < 256; i0++) {
     b_fc1[i0] = (int32_t)(arg_6[i0]) >> 10;
   }
 
-  uint8_t* arg_7 = (uint8_t*)shmat(12255280, nullptr, 0);
+  uint8_t* arg_7 = (uint8_t*)shmat(14090288, nullptr, 0);
   uint8_t* w_fc2 = new uint8_t[10 * 256];
   for (size_t i0 = 0; i0 < 10; i0++) {
     for (size_t i1 = 0; i1 < 256; i1++) {
@@ -96,15 +96,15 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_8 = (int32_t*)shmat(12288051, nullptr, 0);
+  int32_t* arg_8 = (int32_t*)shmat(14123059, nullptr, 0);
   int32_t* b_fc2 = new int32_t[10];
   for (size_t i0 = 0; i0 < 10; i0++) {
     b_fc2[i0] = (int32_t)(arg_8[i0]) >> 10;
   }
 
-  int32_t* arg_9 = (int32_t*)shmat(12320827, nullptr, 0);
-  int32_t* fc2 = new int32_t[100 * 10];
-  for (size_t i0 = 0; i0 < 100; i0++) {
+  int32_t* arg_9 = (int32_t*)shmat(14155835, nullptr, 0);
+  int32_t* fc2 = new int32_t[1 * 10];
+  for (size_t i0 = 0; i0 < 1; i0++) {
     for (size_t i1 = 0; i1 < 10; i1++) {
       fc2[i1 + i0*10] = (int32_t)(arg_9[i1 + i0*10]) >> 10;
     }
@@ -113,6 +113,14 @@ int main(int argc, char ** argv) {
 
   // compute and kernel call from host
   ap_int<32> _top;
+  #pragma HLS array_partition variable=w_fc1 block dim=1 factor=8
+  hls::stream<ap_uint<1> > w_fc1_channel;
+  for (ap_int<32> w_fc10 = 0; w_fc10 < 256; ++w_fc10) {
+    for (ap_int<32> w_fc11 = 0; w_fc11 < 512; ++w_fc11) {
+      w_fc1_channel.write(w_fc1[(w_fc11 + (w_fc10 * 512))]);
+    }
+  }
+  #pragma HLS array_partition variable=bn_t2 block dim=1 factor=8
   hls::stream<ap_fixed<20, 10> > bn_t2_channel;
   for (ap_int<32> bn_t20 = 0; bn_t20 < 32; ++bn_t20) {
     for (ap_int<32> bn_t21 = 0; bn_t21 < 8; ++bn_t21) {
@@ -121,18 +129,24 @@ int main(int argc, char ** argv) {
       }
     }
   }
+  #pragma HLS array_partition variable=b_fc2 complete dim=1
+  hls::stream<ap_fixed<20, 10> > b_fc2_channel;
+  for (ap_int<32> b_fc20 = 0; b_fc20 < 10; ++b_fc20) {
+    b_fc2_channel.write(b_fc2[b_fc20]);
+  }
+  #pragma HLS array_partition variable=input_image block dim=1 factor=8
   hls::stream<ap_uint<1> > input_image_channel;
-  for (ap_int<32> input_image0 = 0; input_image0 < 100; ++input_image0) {
-    for (ap_int<32> input_image2 = 0; input_image2 < 16; ++input_image2) {
-      for (ap_int<32> input_image3 = 0; input_image3 < 16; ++input_image3) {
-        input_image_channel.write(input_image[((input_image3 + (input_image2 * 16)) + (input_image0 * 256))]);
-      }
+  for (ap_int<32> input_image2 = 0; input_image2 < 16; ++input_image2) {
+    for (ap_int<32> input_image3 = 0; input_image3 < 16; ++input_image3) {
+      input_image_channel.write(input_image[(input_image3 + (input_image2 * 16))]);
     }
   }
+  #pragma HLS array_partition variable=b_fc1 block dim=1 factor=8
   hls::stream<ap_fixed<20, 10> > b_fc1_channel;
   for (ap_int<32> b_fc10 = 0; b_fc10 < 256; ++b_fc10) {
     b_fc1_channel.write(b_fc1[b_fc10]);
   }
+  #pragma HLS array_partition variable=w_conv2 block dim=1 factor=8
   hls::stream<ap_uint<1> > w_conv2_channel;
   for (ap_int<32> w_conv20 = 0; w_conv20 < 32; ++w_conv20) {
     for (ap_int<32> w_conv21 = 0; w_conv21 < 16; ++w_conv21) {
@@ -143,6 +157,7 @@ int main(int argc, char ** argv) {
       }
     }
   }
+  #pragma HLS array_partition variable=w_conv1 block dim=1 factor=8
   hls::stream<ap_uint<1> > w_conv1_channel;
   for (ap_int<32> w_conv10 = 0; w_conv10 < 16; ++w_conv10) {
     for (ap_int<32> w_conv12 = 0; w_conv12 < 3; ++w_conv12) {
@@ -151,22 +166,7 @@ int main(int argc, char ** argv) {
       }
     }
   }
-  hls::stream<ap_uint<1> > w_fc2_channel;
-  for (ap_int<32> w_fc20 = 0; w_fc20 < 10; ++w_fc20) {
-    for (ap_int<32> w_fc21 = 0; w_fc21 < 256; ++w_fc21) {
-      w_fc2_channel.write(w_fc2[(w_fc21 + (w_fc20 * 256))]);
-    }
-  }
-  hls::stream<ap_fixed<20, 10> > b_fc2_channel;
-  for (ap_int<32> b_fc20 = 0; b_fc20 < 10; ++b_fc20) {
-    b_fc2_channel.write(b_fc2[b_fc20]);
-  }
-  hls::stream<ap_uint<1> > w_fc1_channel;
-  for (ap_int<32> w_fc10 = 0; w_fc10 < 256; ++w_fc10) {
-    for (ap_int<32> w_fc11 = 0; w_fc11 < 512; ++w_fc11) {
-      w_fc1_channel.write(w_fc1[(w_fc11 + (w_fc10 * 512))]);
-    }
-  }
+  #pragma HLS array_partition variable=bn_t1 block dim=1 factor=8
   hls::stream<ap_fixed<20, 10> > bn_t1_channel;
   for (ap_int<32> bn_t10 = 0; bn_t10 < 16; ++bn_t10) {
     for (ap_int<32> bn_t11 = 0; bn_t11 < 16; ++bn_t11) {
@@ -175,15 +175,20 @@ int main(int argc, char ** argv) {
       }
     }
   }
-  hls::stream<ap_fixed<20, 10> > fc2_channel;
-  test(b_fc2_channel, b_fc1_channel, input_image_channel, w_conv1_channel, bn_t1_channel, w_conv2_channel, bn_t2_channel, w_fc1_channel, w_fc2_channel, fc2_channel);
-  for (ap_int<32> fc20 = 0; fc20 < 100; ++fc20) {
-    for (ap_int<32> fc21 = 0; fc21 < 10; ++fc21) {
-      fc2[(fc21 + (fc20 * 10))] = fc2_channel.read();
+  #pragma HLS array_partition variable=w_fc2 block dim=1 factor=8
+  hls::stream<ap_uint<1> > w_fc2_channel;
+  for (ap_int<32> w_fc20 = 0; w_fc20 < 10; ++w_fc20) {
+    for (ap_int<32> w_fc21 = 0; w_fc21 < 256; ++w_fc21) {
+      w_fc2_channel.write(w_fc2[(w_fc21 + (w_fc20 * 256))]);
     }
   }
+  hls::stream<ap_fixed<20, 10> > fc2_channel;
+  test(w_fc2_channel, b_fc2_channel, b_fc1_channel, w_fc1_channel, bn_t2_channel, w_conv2_channel, bn_t1_channel, w_conv1_channel, input_image_channel, fc2_channel);
+  for (ap_int<32> fc21 = 0; fc21 < 10; ++fc21) {
+    fc2[fc21] = fc2_channel.read();
+  }
 
-  for (size_t i0 = 0; i0 < 100; i0++) {
+  for (size_t i0 = 0; i0 < 1; i0++) {
     for (size_t i1 = 0; i1 < 1; i1++) {
       for (size_t i2 = 0; i2 < 16; i2++) {
         for (size_t i3 = 0; i3 < 16; i3++) {
@@ -249,7 +254,7 @@ int main(int argc, char ** argv) {
     arg_8[i0] = (int32_t)(b_fc2[i0]) << 10;
   }
   shmdt(arg_8);
-  for (size_t i0 = 0; i0 < 100; i0++) {
+  for (size_t i0 = 0; i0 < 1; i0++) {
     for (size_t i1 = 0; i1 < 10; i1++) {
       arg_9[i1 + i0*10] = (int32_t)(fc2[i1 + i0*10]) << 10;
     }
