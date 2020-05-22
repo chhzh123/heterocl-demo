@@ -18,7 +18,7 @@
 #include "kernel.h"
 
 int main(int argc, char ** argv) {
-  int32_t* arg_0 = (int32_t*)shmat(6783000, nullptr, 0);
+  int32_t* arg_0 = (int32_t*)shmat(8683544, nullptr, 0);
   int32_t* A = new int32_t[10 * 32];
   for (size_t i0 = 0; i0 < 10; i0++) {
     for (size_t i1 = 0; i1 < 32; i1++) {
@@ -26,7 +26,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_1 = (int32_t*)shmat(6815773, nullptr, 0);
+  int32_t* arg_1 = (int32_t*)shmat(8716317, nullptr, 0);
   int32_t* D = new int32_t[10 * 32];
   for (size_t i0 = 0; i0 < 10; i0++) {
     for (size_t i1 = 0; i1 < 32; i1++) {

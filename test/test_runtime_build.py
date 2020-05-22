@@ -1,6 +1,6 @@
 import heterocl as hcl
 from itertools import permutations
-import os
+import os, sys
 import numpy as np
 import heterocl.report as report
 
@@ -22,6 +22,7 @@ def test_vivado_hls():
         s.to(kernel.B, target.xcel)
         s.to(kernel.C, target.host)
         target.config(compile="vivado_hls", mode=target_mode)
+        # sys.exit()
         f = hcl.build(s, target)
 
         np_A = np.random.randint(10, size=(10,32))
@@ -32,16 +33,18 @@ def test_vivado_hls():
         f(hcl_A, hcl_B)
         ret_B = hcl_B.asnumpy()
 
-        if target_mode == "csyn":
+        if "csyn" in target_mode:
             report = f.report("csyn")
             assert "ReportVersion" in report
-        else:
+        elif "csim" in target_mode:
             for i in range(0, 10):
                 for j in range(0, 32):
                     assert ret_B[i, j] == (np_A[i, j] + 2) *2
 
-    test_hls("csim")
+    # test_hls("csim")
     test_hls("csyn")
+    # test_hls("csim|csyn")
+    # test_hls("cosim")
 
 if __name__ == '__main__':
     test_vivado_hls()
