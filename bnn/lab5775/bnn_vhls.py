@@ -61,11 +61,16 @@ def add_array_partition(f):
 	return res_f
 
 hcl_array = []
-for name in params:
-	dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
-	hcl_array.append(hcl.asarray(params[name],dtype=dtype))
-hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
 hcl_image = hcl.asarray(images[:batch_size], dtype=qtype_bit)
+hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+if len(sys.argv) == 1 or sys.argv[1] == 2:
+	for name in params:
+		dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
+		hcl_array.append(hcl.asarray(params[name],dtype=dtype))
+else:
+	for name in packed_params:
+		dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+		hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
 
 if len(sys.argv) == 1:
 	f = build_bnn_inf(batch_size,target)
@@ -79,7 +84,6 @@ elif sys.argv[1] == "2":
 	# f = add_array_partition(f)
 	f(hcl_image, *hcl_array, hcl_out)
 else:
-	f = build_bitpacked_bnn_inf(batch_size,"vhls")
+	f = build_bitpacked_bnn_inf(batch_size,target)
 	# f = add_loop_label(f)
-	with open("bnn.cpp","w") as outfile:
-		outfile.write(f)
+	f(hcl_image, *hcl_array, hcl_out)

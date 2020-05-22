@@ -1,6 +1,7 @@
 import heterocl as hcl
 import hlib.op.bnn as bnn
 import numpy as np
+import sys
 
 target = None
 test_size = 100
@@ -155,25 +156,30 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_packed_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
+
+    if isinstance(target,hcl.platform):
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_packed_bnn.fc2, target.host)
+        target.config(compile="vivado_hls", mode="csyn")
+
     return hcl.build(s, target=target)
 
 if __name__ == '__main__':
 
-    f = build_bnn_inf()
-
-    if True:
+    if len(sys.argv) == 1:
         hcl_array = []
         for name in params:
             dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
             hcl_array.append(hcl.asarray(params[name],dtype=dtype))
         hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+        f = build_bnn_inf()
     else:
         hcl_array = []
         for name in packed_params:
             dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
             hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
         hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
-        # hcl_out = hcl.asarray(np.zeros((batch_size,10)),dtype=qtype_packed)
+        f = build_bitpacked_bnn_inf()
 
     correct_sum = 0
     for i in range(num_images // batch_size):
