@@ -3,8 +3,9 @@ from itertools import permutations
 import os, sys
 import numpy as np
 import heterocl.report as report
+import hlib
 
-def test_vivado_hls():
+def simple_add():
     if os.system("which vivado_hls >> /dev/null") != 0:
         return 
 
@@ -12,12 +13,14 @@ def test_vivado_hls():
         A = hcl.placeholder((10, 32), "A", dtype=hcl.UInt(8))
         def kernel(A):
             B = hcl.compute(A.shape, lambda *args : A[args] + 1, "B", dtype=hcl.UInt(8))
-            return B
+            C = hcl.compute(A.shape, lambda *args : B[args] + 1, "B", dtype=hcl.UInt(8))
+            D = hcl.compute(A.shape, lambda *args : C[args] + 1, "D", dtype=hcl.UInt(8))
+            return D
         
         target = hcl.platform.aws_f1
         s = hcl.create_schedule([A], kernel)
         s.to(A, target.xcel)
-        s.to(kernel.B, target.host)
+        s.to(kernel.D, target.host)
         target.config(compile="vivado_hls", mode=target_mode)
         # sys.exit()
         f = hcl.build(s, target)
@@ -36,13 +39,72 @@ def test_vivado_hls():
         elif "csim" in target_mode:
             for i in range(0, 10):
                 for j in range(0, 32):
-                    assert ret_B[i, j] == (np_A[i, j] + 1)
+                    assert ret_B[i, j] == (np_A[i, j] + 3)
 
     # test_hls("csim")
     test_hls("csyn")
     # test_hls("csim|csyn")
     # test_hls("cosim")
 
+def one_conv():
+    if os.system("which vivado_hls >> /dev/null") != 0:
+        return 
+
+    A = hcl.placeholder((1,1,16,16), "A")
+    w1 = hcl.placeholder((1,3,3,3), "w1")
+
+    def kernel(A, w1):
+        conv1 = hlib.op.nn.conv2d_nchw(A, w1, padding=[1,1], name="conv1")
+        return conv1
+    
+    target = hcl.platform.zc706
+    s = hcl.create_schedule([A, w1], kernel)
+    s.to([A, w1], target.xcel)
+    s.to(kernel.conv1, target.host)
+    target.config(compile="vivado_hls", mode="csim")
+    f = hcl.build(s, target)
+
+    np_A = np.random.randint(0, 256, size=(1,1,16,16))
+    np_w1 = np.random.randint(0, 10, size=(1,3,3,3))
+    np_B = np.zeros((1,3,16,16))
+
+    hcl_A = hcl.asarray(np_A)
+    hcl_w1 = hcl.asarray(np_w1)
+    hcl_B = hcl.asarray(np_B)
+    f(hcl_A, hcl_w1, hcl_B)
+
+def double_conv():
+    if os.system("which vivado_hls >> /dev/null") != 0:
+        return 
+
+    A = hcl.placeholder((1,1,16,16), "A")
+    w1 = hcl.placeholder((1,3,3,3), "w1")
+    w2 = hcl.placeholder((3,6,3,3), "w2")
+
+    def kernel(A, w1, w2):
+        conv1 = hlib.op.nn.conv2d_nchw(A, w1, padding=[1,1], name="conv1")
+        conv2 = hlib.op.nn.conv2d_nchw(conv1, w2, padding=[1,1], name="conv2")
+        return conv2
+    
+    target = hcl.platform.zc706
+    s = hcl.create_schedule([A, w1, w2], kernel)
+    s.to([A, w1, w2], target.xcel)
+    s.to(kernel.conv2, target.host)
+    target.config(compile="vivado_hls", mode="csyn")
+    f = hcl.build(s, target)
+
+    np_A = np.random.randint(0, 256, size=(1,1,16,16))
+    np_w1 = np.random.randint(0, 10, size=(1,3,3,3))
+    np_w2 = np.random.randint(0, 10, size=(3,6,3,3))
+    np_B = np.zeros((1,6,16,16))
+
+    hcl_A = hcl.asarray(np_A)
+    hcl_w1 = hcl.asarray(np_w1)
+    hcl_w2 = hcl.asarray(np_w2)
+    hcl_B = hcl.asarray(np_B)
+    f(hcl_A, hcl_w1, hcl_w2, hcl_B)
+
 if __name__ == '__main__':
-    test_vivado_hls()
-    # report.parse_xml("project",True)
+    # simple_add()
+    # one_conv()
+    double_conv()
