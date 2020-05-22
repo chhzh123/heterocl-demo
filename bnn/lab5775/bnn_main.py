@@ -1,7 +1,8 @@
 import heterocl as hcl
-import hlib
+import hlib.op.bnn as bnn
 import numpy as np
-target = None
+
+target = hcl.platform.zc706 # None
 test_size = 100
 batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
@@ -14,15 +15,15 @@ def build_bnn(input_image, w_conv1, bn_t1,
               w_conv2, bn_t2,
               w_fc1, b_fc1,
               w_fc2, b_fc2): # 1*16*16
-    conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
-    bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    maxpool1 = hlib.op.bnn.max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
-    conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
-    bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
-    maxpool2 = hlib.op.bnn.max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
-    flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
-    fc1 = hlib.op.bnn.dense(flat, w_fc1, b_fc1, True, name="fc1") # 512->256
-    fc2 = hlib.op.bnn.dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256->10
+    conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
+    bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
+    maxpool1 = bnn.max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+    conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+    bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
+    maxpool2 = bnn.max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    flat = bnn.flatten(maxpool2, name="flatten")
+    fc1 = bnn.dense(flat, w_fc1, b_fc1, True, name="fc1") # 512->256
+    fc2 = bnn.dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256->10
     return fc2
 
 counts = hcl.array(np.array(list(bytes(bin(i).count("1") for i in range(256)))))
@@ -31,21 +32,21 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_conv2, bn_t2,
                      w_fc1, b_fc1,
                      w_fc2, b_fc2): # 1*16*16
-    conv1 = hlib.op.bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
-    bn1 = hlib.op.bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
+    conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
+    bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
     packed_bn1 = hcl.pack(bn1, axis=1, factor=16, dtype=hcl.UInt(16), name="packed_bn1") # 1*8*8
-    maxpool1 = hlib.op.bnn.packed_max_pool2d_nchw(packed_bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+    maxpool1 = bnn.packed_max_pool2d_nchw(packed_bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
 
-    conv2 = hlib.op.bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
-    bn2 = hlib.op.bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
+    conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+    bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
     packed_bn2 = hcl.pack(bn2, axis=1, factor=32, dtype=qtype_packed, name="packed_bn2") # 1*8*8
-    maxpool2 = hlib.op.bnn.packed_max_pool2d_nchw(packed_bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    maxpool2 = bnn.packed_max_pool2d_nchw(packed_bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
 
-    flat = hlib.op.bnn.flatten(maxpool2, name="flatten")
+    flat = bnn.flatten(maxpool2, name="flatten")
     pack = hcl.pack(flat, axis=1, factor=32, dtype=qtype_packed, name="pack") # 512/32=16
-    fc1 = hlib.op.bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512->256
+    fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512->256
     pack2 = hcl.pack(fc1, axis=1, factor=32, dtype=qtype_packed, name="pack2")
-    fc2 = hlib.op.bnn.packed_dense(pack2, w_fc2, b_fc2, False, name="fc2") # 256->10
+    fc2 = bnn.packed_dense(pack2, w_fc2, b_fc2, False, name="fc2") # 256->10
     return fc2
 
 def packbits(arr, bitwidth):
@@ -81,6 +82,10 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
+    if target != None:
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_bnn.fc2, target.host)
+        target.config(compile="vivado_hls", mode="csyn")
     return hcl.build(s, target=target)
 
 def build_bnn_inf_opt(batch_size=batch_size,target=target):
@@ -146,9 +151,9 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
 
 if __name__ == '__main__':
 
-    f = build_bitpacked_bnn_inf()
+    f = build_bnn_inf()
 
-    if False:
+    if True:
         hcl_array = []
         for name in params:
             dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
