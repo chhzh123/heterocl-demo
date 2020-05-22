@@ -21,9 +21,10 @@ def test_vivado_hls():
         s = hcl.create_schedule([A], kernel)
         s.to(kernel.B, target.xcel)
         s.to(kernel.C, target.host)
-        target.config(compile="vivado_hls", mode=target_mode, tcl=open("run-test.tcl","r").read())
-        # sys.exit()
+        # target.config(compile="vivado_hls", mode=target_mode, tcl=open("run-test.tcl","r").read())
+        target.config(compile="vivado_hls", mode=target_mode)
         f = hcl.build(s, target)
+        # sys.exit()
 
         np_A = np.random.randint(10, size=(10,32))
         np_B = np.zeros((10,32))
@@ -42,9 +43,10 @@ def test_vivado_hls():
                     assert ret_B[i, j] == (np_A[i, j] + 2) *2
 
     # test_hls("csim")
-    test_hls("csyn")
-    # test_hls("csim|csyn")
+    # test_hls("csyn")
+    test_hls("csim|csyn")
     # test_hls("cosim")
+    # test_hls("impl")
 
 if __name__ == '__main__':
     test_vivado_hls()
