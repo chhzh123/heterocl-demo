@@ -21,7 +21,7 @@ def test_vivado_hls():
         s = hcl.create_schedule([A], kernel)
         s.to(kernel.B, target.xcel)
         s.to(kernel.C, target.host)
-        target.config(compile="vivado_hls", mode=target_mode)
+        target.config(compile="vivado_hls", mode=target_mode, tcl=open("run-test.tcl","r").read())
         # sys.exit()
         f = hcl.build(s, target)
 
