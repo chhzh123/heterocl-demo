@@ -148,7 +148,7 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
 def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     # prepare placeholder
     hcl_ph = []
-    input_image = hcl.placeholder(images.shape,"input_image",qtype_bit)
+    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in packed_params:
         dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
         hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
@@ -156,6 +156,68 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_packed_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
+
+    if isinstance(target,hcl.platform):
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_packed_bnn.fc2, target.host)
+        target.config(compile="vivado_hls", mode="csyn")
+
+    return hcl.build(s, target=target)
+
+def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
+    # prepare placeholder
+    hcl_ph = []
+    input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
+    for name in packed_params:
+        dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+        hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
+
+    # build the network
+    scheme = hcl.create_scheme([input_image] + hcl_ph, build_packed_bnn)
+    s = hcl.create_schedule_from_scheme(scheme)
+
+    # compute optimization
+    print(build_packed_bnn.__dict__.keys())
+    for layer in build_packed_bnn.__dict__.keys():
+        s_layer = getattr(build_packed_bnn,layer)
+        if "pad" in layer:
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif layer == "bn1": # fuse conv
+            s_conv = build_packed_bnn.conv1
+            s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
+            s[s_layer].pipeline(s_layer.axis[2])
+        elif "packed" in layer:
+            s[s_layer].pipeline(s_layer.axis[3])
+        elif layer in ["pack","pack2"]:
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif layer == "maxpool1":
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif layer == "bn2":
+            s_conv = build_packed_bnn.conv2
+            s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
+            s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
+        elif layer == "maxpool2":
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif layer == "flatten":
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif layer == "fc1_xor":
+            s_popcnt = build_packed_bnn.fc1_popcount
+            s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
+            s_matmal = build_packed_bnn.fc1_matmul
+            s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
+            s_bias = build_packed_bnn.fc1_bias
+            s[s_matmal].compute_at(s[s_bias],s_bias.axis[1])
+            s_fc1 = build_packed_bnn.fc1
+            s[s_bias].compute_at(s[s_fc1],s_fc1.axis[1])
+            s[s_fc1].pipeline(s_fc1.axis[1])
+        elif layer == "fc2_xor":
+            s_popcnt = build_packed_bnn.fc2_popcount
+            s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
+            s_matmal = build_packed_bnn.fc2_matmul
+            s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
+            s_fc2 = build_packed_bnn.fc2
+            s[s_matmal].compute_at(s[s_fc2],s_fc2.axis[1])
+            s[s_fc2].pipeline(s_fc2.axis[1])
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)

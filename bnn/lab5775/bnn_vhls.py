@@ -4,7 +4,7 @@ import numpy as np
 import sys
 from bnn_main import *
 
-batch_size = 1
+batch_size = 2
 target = hcl.platform.zc706
 
 def add_loop_label(f,loop_name=["pad","conv1","bn1","maxpool1",
@@ -83,7 +83,12 @@ elif sys.argv[1] == "2":
 	# f = add_pipeline_pad(f)
 	# f = add_array_partition(f)
 	f(hcl_image, *hcl_array, hcl_out)
-else:
+elif sys.argv[1] == "3":
 	f = build_bitpacked_bnn_inf(batch_size,target)
 	# f = add_loop_label(f)
 	f(hcl_image, *hcl_array, hcl_out)
+elif sys.argv[1] == "4":
+	f = build_bitpacked_bnn_inf_opt(batch_size,target)
+	f(hcl_image, *hcl_array, hcl_out)
+else:
+	raise RuntimeError("Not supported mode")
