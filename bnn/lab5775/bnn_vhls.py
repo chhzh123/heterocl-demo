@@ -4,7 +4,7 @@ import numpy as np
 import sys
 from bnn_main import *
 
-batch_size = 2
+batch_size = 1
 target = hcl.platform.zc706
 
 def add_loop_label(f,loop_name=["pad","conv1","bn1","maxpool1",
