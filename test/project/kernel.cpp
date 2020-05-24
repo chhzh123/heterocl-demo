@@ -6,12 +6,9 @@
 #include <math.h>
 #include <stdint.h>
 #include "kernel.h"
-
   void test(hls::stream<bit32>& B_channel, hls::stream<bit32>& C_channel) {
-  #pragma HLS INTERFACE axis port=B_channel depth=1 offset=slave bundle=gmem0
-  #pragma HLS INTERFACE axis port=C_channel depth=1 offset=slave bundle=gmem1
-  #pragma HLS INTERFACE s_axilite port=B_channel bundle=control
-  #pragma HLS INTERFACE s_axilite port=C_channel bundle=control
+  #pragma HLS INTERFACE axis port=B_channel offset=slave bundle=gmem0
+  #pragma HLS INTERFACE axis port=C_channel offset=slave bundle=gmem1
   #pragma HLS INTERFACE s_axilite port=return bundle=control
     bit32 B[320];
     for (bit32 B0 = 0; B0 < 10; ++B0) {

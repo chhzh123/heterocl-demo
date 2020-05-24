@@ -28,6 +28,12 @@ create_clock -period 10
 ############################################
 
 # Simulate the C++ design
-csim_design -O
+#csim_design -O
+# Synthesize the design
+csynth_design
+# Co-simulate the design
+#cosim_design
+# Implement the design
+#export_design -flow impl
 
 exit

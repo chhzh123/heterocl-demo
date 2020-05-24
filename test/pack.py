@@ -144,11 +144,32 @@ def test8(): # endian
     print("Output: {}".format(out_array.asnumpy()))
     print("Numpy out: {}".format(np_out))
 
+def test9():
+    def pack(A):
+        pack = hcl.pack(A, axis=0, factor=8, dtype=hcl.UInt(8))
+        return pack
+
+    hcl.init()
+    a = hcl.placeholder((32,4,4), dtype=hcl.UInt(1), name="A")
+    s = hcl.create_schedule([a], pack)
+    f = hcl.build(s)
+
+    np_array = np.random.randint(0,2,(32,4,4)).astype(np.bool)
+    np_out = np.packbits(np_array,axis=0,bitorder="little")
+    in_array = hcl.asarray(np_array, dtype=hcl.UInt(1))
+    out_array = hcl.asarray(np.zeros((4,4,4)), dtype=hcl.UInt(8))
+    f(in_array, out_array)
+    # print("Input: {}".format(in_array.asnumpy()))
+    print("Output: {}".format(out_array.asnumpy()))
+    print("Numpy out: {}".format(np_out))
+
 if __name__ == '__main__':
     # test1()
     # test2()
     # test3()
     # test4()
     # test5()
-    test6()
-    test7()
+    # test6()
+    # test7()
+    # test8()
+    test9()

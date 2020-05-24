@@ -5,6 +5,7 @@ import sys
 from bnn_main import *
 
 batch_size = 1
+target = hcl.platform.zc706
 
 def add_loop_label(f,loop_name=["pad","conv1","bn1","maxpool1",
 								"pad1","conv2","bn2","maxpool2",
@@ -59,25 +60,35 @@ def add_array_partition(f):
 	res_f += "\n".join(lines)
 	return res_f
 
-if len(sys.argv) == 1:
-	f = build_bnn_inf(batch_size,"vhls")
-	f = add_loop_label(f)
-	with open("bnn.cpp","w") as outfile:
-		outfile.write(f)
-elif sys.argv[1] == "2":
-	f = build_bnn_inf_opt(batch_size,"vhls")
-	f = add_loop_label(f, ["pad","conv_bn1","maxpool1",
-				 		   "pad1","conv_bn2","maxpool2",
-						   "flatten","fc1","fc2"])
-	f = add_pipeline_pad(f)
-	f_lst = f.split("(0U)")
-	print(len(f_lst))
-	f = '(ap_uint<32>)(0U)'.join(f_lst)
-	# f = add_array_partition(f)
-	with open("bnn.cpp","w") as outfile:
-		outfile.write(f)
+hcl_array = []
+hcl_image = hcl.asarray(images[:batch_size], dtype=qtype_bit)
+hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+if len(sys.argv) == 1 or sys.argv[1] == 2:
+	for name in params:
+		dtype = qtype_bit if ("conv" in name or "w_" in name) else qtype_float
+		hcl_array.append(hcl.asarray(params[name],dtype=dtype))
 else:
-	f = build_bitpacked_bnn_inf(batch_size,"vhls")
+	for name in packed_params:
+		dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+		hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
+
+if len(sys.argv) == 1:
+	f = build_bnn_inf(batch_size,target)
+	f(hcl_image, *hcl_array, hcl_out)
+elif sys.argv[1] == "2":
+	f = build_bnn_inf_opt(batch_size,target)
+	# f = add_loop_label(f, ["pad","conv_bn1","maxpool1",
+	# 			 		   "pad1","conv_bn2","maxpool2",
+	# 					   "flatten","fc1","fc2"])
+	# f = add_pipeline_pad(f)
+	# f = add_array_partition(f)
+	f(hcl_image, *hcl_array, hcl_out)
+elif sys.argv[1] == "3":
+	f = build_bitpacked_bnn_inf(batch_size,target)
 	# f = add_loop_label(f)
-	with open("bnn.cpp","w") as outfile:
-		outfile.write(f)
+	f(hcl_image, *hcl_array, hcl_out)
+elif sys.argv[1] == "4":
+	f = build_bitpacked_bnn_inf_opt(batch_size,target)
+	f(hcl_image, *hcl_array, hcl_out)
+else:
+	raise RuntimeError("Not supported mode")
