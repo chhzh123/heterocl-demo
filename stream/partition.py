@@ -5,7 +5,7 @@ import numpy as np
 import heterocl.report as report
 import hlib
 
-def simple_add():
+def partition_test():
     if os.system("which vivado_hls >> /dev/null") != 0:
         return 
 
@@ -16,9 +16,9 @@ def simple_add():
 
     target = hcl.platform.zc706
     s = hcl.create_schedule([A], kernel)
-    s.to(A, target.xcel)
     s.to(kernel.B, target.host)
-    s.partition(A, hcl.Partition.Block, dim=1, factor=2)
+    A_ = s.to(A, target.xcel)
+    s.partition(A_, hcl.Partition.Block, dim=1, factor=2)
     target.config(compile="vivado_hls", mode="csim")
     f = hcl.build(s, target)
 
@@ -31,4 +31,4 @@ def simple_add():
     ret_B = hcl_B.asnumpy()
 
 if __name__ == "__main__":
-    simple_add()
+    partition_test()
