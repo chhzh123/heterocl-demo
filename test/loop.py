@@ -2,7 +2,7 @@ import heterocl as hcl
 import os, sys
 import numpy as np
 
-size = 1
+size = 2
 
 def test_loop():
 
@@ -14,6 +14,8 @@ def test_loop():
     
     target = None # hcl.platform.zc706
     s = hcl.create_schedule([A], kernel)
+    s_B = kernel.B
+    s[s_B].pipeline(s_B.axis[0])
     f = hcl.build(s, target)
     print(hcl.lower(s))
 
