@@ -4,6 +4,8 @@ import os, sys
 import numpy as np
 import heterocl.report as report
 
+tcl = None
+
 def test_vivado_hls():
     if os.system("which vivado_hls >> /dev/null") != 0:
         return 
@@ -17,15 +19,21 @@ def test_vivado_hls():
             D = hcl.compute(A.shape, lambda *args : C[args] * 2, "D")
             return D
         
-        target = hcl.platform.aws_f1
+        target = hcl.platform.zc706
+        # target = hcl.platform.llvm
         s = hcl.create_schedule([A], kernel)
         s.to(kernel.B, target.xcel)
         s.to(kernel.C, target.host)
-        tcl = open("run-test.tcl","r").read()
-        target.config(compile="vivado_hls", script=tcl)
-        # target = hcl.platform.llvm
-        # target.config(compile="vivado_hls", mode=target_mode)
+        if target_mode == "customized":
+            tcl = open("run-test.tcl","r").read()
+            target.config(compile="vivado_hls", script=tcl)
+        else:
+            target.config(compile="vivado_hls", mode=target_mode)
         f = hcl.build(s, target)
+
+        if target_mode == "debug":
+            print(f)
+            return
 
         np_A = np.random.randint(10, size=(10,32))
         np_B = np.zeros((10,32))
@@ -42,11 +50,53 @@ def test_vivado_hls():
             np.testing.assert_array_equal(ret_B, (np_A + 2) * 2)
 
     # test_hls("csim")
-    test_hls("csyn")
+    # test_hls("csyn")
     # test_hls("csim|csyn")
     # test_hls("cosim")
     # test_hls("impl")
+    # test_hls("customized")
+    test_hls("debug")
+
+def test_debug_mode():
+    hcl.init()
+    A = hcl.placeholder((10, 32), "A")
+    def kernel(A):
+        B = hcl.compute(A.shape, lambda *args : A[args] + 1, "B")
+        C = hcl.compute(A.shape, lambda *args : B[args] + 1, "C")
+        D = hcl.compute(A.shape, lambda *args : C[args] * 2, "D")
+        return D
+    
+    target = hcl.platform.aws_f1
+    s = hcl.create_schedule([A], kernel)
+    s.to(kernel.B, target.xcel)
+    s.to(kernel.C, target.host)
+
+    target.config(compile="sdaccel", mode="debug", backend="vhls")
+    code = hcl.build(s, target)
+    print(code)
+    assert "cl::Kernel kernel(program, \"test\", &err)" in code
+
+def test_vhls_debug():
+    hcl.init()
+    A = hcl.placeholder((10, 32), "A")
+    def kernel(A):
+        B = hcl.compute(A.shape, lambda *args : A[args] + 1, "B")
+        C = hcl.compute(A.shape, lambda *args : B[args] + 1, "C")
+        D = hcl.compute(A.shape, lambda *args : C[args] * 2, "D")
+        return D
+    
+    target = hcl.platform.zc706
+    s = hcl.create_schedule([A], kernel)
+    s.to(kernel.B, target.xcel)
+    s.to(kernel.C, target.host)
+
+    target.config(compile="vivado_hls", mode="debug", backend="vhls")
+    code = hcl.build(s, target)
+    print(code)
+    assert "test(B_channel, C_channel)" in code
 
 if __name__ == '__main__':
-    test_vivado_hls()
+    # test_vivado_hls()
     # report.parse_xml("project",True)
+    # test_debug_mode()
+    test_vhls_debug()
