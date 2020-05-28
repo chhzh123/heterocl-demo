@@ -163,6 +163,27 @@ def test9():
     print("Output: {}".format(out_array.asnumpy()))
     print("Numpy out: {}".format(np_out))
 
+def test10():
+    def pack(A):
+        rk = hcl.reduce_axis(0, 4, name='rk')
+        genpack = hcl.reducer(0, lambda x, y: y * 2 + x, dtype=hcl.UInt(4)) # y is accumulator
+        pack = hcl.compute((2,),lambda x: genpack(A[x*4+(3-rk)],axis=rk),dtype=hcl.UInt(4))
+        # pack = hcl.pack(A, axis=0, factor=4, dtype=hcl.UInt(4))
+        return pack
+
+    hcl.init()
+    a = hcl.placeholder((8,), dtype=hcl.UInt(1), name="A")
+    s = hcl.create_schedule([a], pack)
+    f = hcl.build(s)
+
+    # np_array = np.random.randint(0,2,(8,)).astype(np.bool)
+    np_array = np.array([0,1,0,1,1,0,1,1]).astype(np.bool)
+    in_array = hcl.asarray(np_array, dtype=hcl.UInt(1))
+    out_array = hcl.asarray(np.zeros((2,)), dtype=hcl.UInt(4))
+    f(in_array, out_array)
+    print("Input: {}".format(in_array.asnumpy()))
+    print("Output: {}".format(out_array.asnumpy()))
+
 if __name__ == '__main__':
     # test1()
     # test2()
@@ -172,4 +193,5 @@ if __name__ == '__main__':
     # test6()
     # test7()
     # test8()
-    test9()
+    # test9()
+    test10()
