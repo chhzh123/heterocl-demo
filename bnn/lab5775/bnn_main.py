@@ -35,19 +35,16 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_fc2, b_fc2): # 1*16*16
     conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
     bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    packed_bn1 = hcl.pack(bn1, axis=1, factor=16, dtype=hcl.UInt(16), name="packed_bn1") # 1*8*8
-    maxpool1 = bnn.packed_max_pool2d_nchw(packed_bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
 
     conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
-    packed_bn2 = hcl.pack(bn2, axis=1, factor=32, dtype=qtype_packed, name="packed_bn2") # 1*8*8
-    maxpool2 = bnn.packed_max_pool2d_nchw(packed_bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
 
     flat = bnn.flatten(maxpool2, name="flatten")
     pack = hcl.pack(flat, axis=1, factor=32, dtype=qtype_packed, name="pack") # 512/32=16
-    fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512->256
-    pack2 = hcl.pack(fc1, axis=1, factor=32, dtype=qtype_packed, name="pack2")
-    fc2 = bnn.packed_dense(pack2, w_fc2, b_fc2, False, name="fc2") # 256->10
+    fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512/32->256/32
+    fc2 = bnn.packed_dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256/32->10
     return fc2
 
 def packbits(arr, bitwidth):
@@ -186,19 +183,24 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_conv = build_packed_bnn.conv1
             s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
             s[s_layer].pipeline(s_layer.axis[2])
-        elif "packed" in layer:
-            s[s_layer].pipeline(s_layer.axis[3])
-        elif layer in ["pack","pack2"]:
-            s[s_layer].pipeline(s_layer.axis[1])
+            # s_packed = build_packed_bnn.packed_bn1
+            # s[s_layer].compute_at(s[s_packed],s_packed.axis[3])
+        # elif layer in ["pack2"]:
+        #     s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "maxpool1":
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "bn2":
             s_conv = build_packed_bnn.conv2
+            s[s_layer].pipeline(s_layer.axis[4]) # be careful of # channels
+            s[s_conv].pipeline(s_conv.axis[4])
             s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
-            s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
         elif layer == "maxpool2":
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "flatten":
+            x_out, x_in = s[s_layer].split(s_layer.axis[1], 32)
+            s_pack = build_packed_bnn.pack
+            s[s_layer].compute_at(s[s_pack],s_pack.axis[1])
+            s[s_pack].pipeline(s_pack.axis[1])
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "fc1_xor":
             s_popcnt = build_packed_bnn.fc1_popcount
@@ -208,7 +210,7 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_bias = build_packed_bnn.fc1_bias
             s[s_matmal].compute_at(s[s_bias],s_bias.axis[1])
             s_fc1 = build_packed_bnn.fc1
-            s[s_bias].compute_at(s[s_fc1],s_fc1.axis[1])
+            # s[s_bias].compute_at(s[s_fc1],s_fc1.axis[1])
             s[s_fc1].pipeline(s_fc1.axis[1])
         elif layer == "fc2_xor":
             s_popcnt = build_packed_bnn.fc2_popcount
