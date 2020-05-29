@@ -7,21 +7,6 @@ from bnn_main import *
 batch_size = 1
 target = hcl.platform.zc706
 
-def add_loop_label(f,loop_name=["pad","conv1","bn1","maxpool1",
-								"pad1","conv2","bn2","maxpool2",
-								"flatten","fc1","dense_relu",
-								"fc2"]):
-	lines = f.split("\n")
-	cnt = 1
-	res_f = ""
-	for i,line in enumerate(lines):
-		if line[:7] == "    for":
-			res_f += "LOOP_{}: {}\n".format(cnt,line.strip())
-			cnt += 1
-		else:
-			res_f += line + "\n"
-	return res_f
-
 # add HLS pragmas manually
 def add_pipeline_pad(f):
 	lines = f.split("\n")
@@ -89,14 +74,17 @@ elif sys.argv[1] == "3":
 	f(hcl_image, *hcl_array, hcl_out)
 elif sys.argv[1] == "4":
 	f = build_bitpacked_bnn_inf_opt(batch_size,target)
-	f(hcl_image, *hcl_array, hcl_out)
-	new_code = add_loop_label(open("project/kernel.cpp","r").read())
-	kernel_file = open("project/kernel.cpp","w")
-	kernel_file.write(new_code)
+	# f(hcl_image, *hcl_array, hcl_out)
 	report = f.report("csyn")
 	overall = 0
 	for i in range(10,20):
-		latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["Loop{}".format(i)]["Latency"]
+		try:
+			latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}".format(i)]["Latency"]
+		except:
+			try:
+				latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["Loop{}".format(i)]["Latency"]
+			except:
+				latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}_L".format(i)]["Latency"]
 		print("Loop {}: {}".format(i,latency))
 		overall += int(latency)
 	print("Overall: {}".format(overall))
