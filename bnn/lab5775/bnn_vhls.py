@@ -74,10 +74,11 @@ elif sys.argv[1] == "3":
 	f(hcl_image, *hcl_array, hcl_out)
 elif sys.argv[1] == "4":
 	f = build_bitpacked_bnn_inf_opt(batch_size,target)
-	# f(hcl_image, *hcl_array, hcl_out)
+	f(hcl_image, *hcl_array, hcl_out)
 	report = f.report("csyn")
 	overall = 0
-	for i in range(10,20):
+	loop_num = open("project/kernel.cpp","r").read().count("LOOP")
+	for i in range(10,loop_num):
 		try:
 			latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}".format(i)]["Latency"]
 		except:

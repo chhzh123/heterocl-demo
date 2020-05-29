@@ -188,37 +188,48 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         # elif layer in ["pack2"]:
         #     s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "maxpool1":
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[2])
         elif layer == "bn2":
             s_conv = build_packed_bnn.conv2
-            s[s_layer].pipeline(s_layer.axis[4]) # be careful of # channels
-            s[s_conv].pipeline(s_conv.axis[4])
-            s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
+            s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
+            s[s_conv].pipeline(s_conv.axis[3])
+            # s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
         elif layer == "maxpool2":
+            s[s_layer].pipeline(s_layer.axis[2])
+        elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "flatten":
-            x_out, x_in = s[s_layer].split(s_layer.axis[1], 32)
+            # x_out, x_in = s[s_layer].split(s_layer.axis[1], 32)
             s_pack = build_packed_bnn.pack
-            s[s_layer].compute_at(s[s_pack],s_pack.axis[1])
+            # s[s_layer].compute_at(s[s_pack],s_pack.axis[1])
             s[s_pack].pipeline(s_pack.axis[1])
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "fc1_xor":
+            s[s_layer].pipeline(s_layer.axis[1])
             s_popcnt = build_packed_bnn.fc1_popcount
-            s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
+            # s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
+            s[s_popcnt].pipeline(s_popcnt.axis[1])
             s_matmal = build_packed_bnn.fc1_matmul
-            s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
+            s[s_matmal].pipeline(s_matmal.axis[1])
+            # s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
             s_bias = build_packed_bnn.fc1_bias
+            s[s_bias].pipeline(s_bias.axis[1])
             s[s_matmal].compute_at(s[s_bias],s_bias.axis[1])
+            s[s_matmal].pipeline(s_matmal.axis[1])
             s_fc1 = build_packed_bnn.fc1
             # s[s_bias].compute_at(s[s_fc1],s_fc1.axis[1])
             s[s_fc1].pipeline(s_fc1.axis[1])
         elif layer == "fc2_xor":
+            s[s_layer].pipeline(s_layer.axis[1])
             s_popcnt = build_packed_bnn.fc2_popcount
-            s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
+            s[s_popcnt].pipeline(s_popcnt.axis[1])
+            # s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
             s_matmal = build_packed_bnn.fc2_matmul
-            s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
+            s[s_matmal].pipeline(s_matmal.axis[1])
+            # s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
             s_fc2 = build_packed_bnn.fc2
-            s[s_matmal].compute_at(s[s_fc2],s_fc2.axis[1])
+            # s[s_matmal].compute_at(s[s_fc2],s_fc2.axis[1])
+            # s[s_fc2].pipeline(s_fc2.axis[1])
             s[s_fc2].pipeline(s_fc2.axis[1])
 
     if isinstance(target,hcl.platform):
