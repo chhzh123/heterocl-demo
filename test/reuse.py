@@ -46,8 +46,59 @@ def test_reuse_blur_x():
 
     assert np.array_equal(np_B, np_C)
 
-test_reuse_blur_x()
-test_tutorial()
+def test_reuse_blur_x_with_to():
+    hcl.init()
+    A = hcl.placeholder((10, 10), name="A")
+    def kernel(A):
+        B = hcl.compute((10, 8), lambda y, x: A[y, x] + A[y, x+1] + A[y, x+2],name="B")
+        C = hcl.compute((10, 8), lambda y, x: B[y, x], name="C")
+        return C
+    s = hcl.create_schedule([A], kernel)
+    kernel_B = kernel.B
+    RB = s.reuse_at(A, s[kernel_B], kernel_B.axis[1])
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls",mode="csim")
+    s.to(kernel.B, target.xcel)
+    s.to(kernel.C, target.host)
+    # target = None
+    f = hcl.build(s, target)
+
+def test_reuse_compute():
+    hcl.init()
+    A = hcl.placeholder((10, 10),name="A")
+    B = hcl.compute((10, 10), lambda y, x: A[y, x], "B")
+    C = hcl.compute((10, 8), lambda y, x: B[y, x] + B[y, x+1] + B[y, x+2], "C")
+    s = hcl.create_schedule([A, B, C])
+    RB = s.reuse_at(B, s[C], C.axis[1])
+    print(hcl.lower(s))
+    f = hcl.build(s)
+
+def test_reuse_compute2():
+    hcl.init()
+    ph_A = hcl.placeholder((10, 10),name="A")
+    ph_C = hcl.placeholder((10, 8),name="C")
+    ph_B = None
+    def kernel(A):
+        nonlocal ph_B
+        B = hcl.compute((10, 10), lambda y, x: A[y, x], "B")
+        ph_B = B
+        C = hcl.compute((10, 8), lambda y, x: B[y, x] + B[y, x+1] + B[y, x+2], "C")
+        return C
+    target = hcl.platform.zc706
+    # target = None
+    s = hcl.create_schedule([ph_A], kernel)
+    RB = s.reuse_at(ph_B, s[kernel.C], kernel.C.axis[1])
+    s.to(kernel.B, target.xcel)
+    s.to(kernel.C, target.host)
+    print(hcl.lower(s))
+    target.config(compile="vivado_hls",mode="csim")
+    f = hcl.build(s, target)
+
+# test_reuse_blur_x()
+# test_tutorial()
+# test_reuse_compute()
+# test_reuse_compute2()
+test_reuse_blur_x_with_to()
 
 # hcl_Bxy = hcl.asarray(np.zeros((4, 4)))
 # f = hcl.build(s_xy)
