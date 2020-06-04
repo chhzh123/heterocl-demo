@@ -22,10 +22,11 @@ def test_tutorial():
 
 def test_reuse_blur_x():
     hcl.init()
-    A = hcl.placeholder((10, 10))
+    A = hcl.placeholder((10, 10),name="A")
     B = hcl.compute((10, 8), lambda y, x: A[y, x] + A[y, x+1] + A[y, x+2])
     s = hcl.create_schedule([A, B])
     RB = s.reuse_at(A, s[B], B.axis[1])
+    # print(s[B].op.body)
     f = hcl.build(s)
 
     np_A = np.random.randint(0, 10, size=(10, 10))
@@ -46,6 +47,7 @@ def test_reuse_blur_x():
     assert np.array_equal(np_B, np_C)
 
 test_reuse_blur_x()
+test_tutorial()
 
 # hcl_Bxy = hcl.asarray(np.zeros((4, 4)))
 # f = hcl.build(s_xy)
