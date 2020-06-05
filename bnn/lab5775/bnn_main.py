@@ -28,21 +28,32 @@ def build_bnn(input_image, w_conv1, bn_t1,
     return fc2
 
 counts = hcl.array(np.array(list(bytes(bin(i).count("1") for i in range(256)))))
+PACK_CONV = True
 
 def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_conv2, bn_t2,
                      w_fc1, b_fc1,
                      w_fc2, b_fc2): # 1*16*16
-    conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
+    if PACK_CONV:
+        conv1 = bnn.packed_conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
+    else:
+        conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
     bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1") # 16*8*8
+    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=True) # 16*8*8
 
-    conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+    if False:
+        w = hcl.pack(w_conv2, axis=1, factor=16, dtype=hcl.UInt(16), name="w")
+        conv2 = bnn.packed_conv2d_nchw(maxpool1, w, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+    else:
+        conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
-    maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2",unpack=False) # 32*4*4=512
 
-    flat = bnn.flatten(maxpool2, name="flatten")
-    pack = hcl.pack(flat, axis=1, factor=32, dtype=qtype_packed, name="pack") # 512/32=16
+    if PACK_CONV:
+        pack = bnn.packed_flatten(maxpool2,name="packed_flatten")
+    else:
+        flat = bnn.flatten(maxpool2, name="flatten")
+        pack = hcl.pack(flat, axis=1, factor=32, dtype=qtype_packed, name="pack") # 512/32=16
     fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512/32->256/32
     fc2 = bnn.packed_dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256/32->10
     return fc2
@@ -66,6 +77,8 @@ packed_params = {}
 for name in params:
     if "w_fc" in name:
         packed_params[name] = packbits(params[name].copy().astype(np.bool),32)
+    # elif "w_conv2" in name:
+        # packed_params[name] = np.packbits(arr,axis=1,bitorder="little").view(np.uint16)
     else:
         packed_params[name] = params[name].copy()
 
@@ -193,6 +206,10 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_conv = build_packed_bnn.conv2
             s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
             s[s_conv].pipeline(s_conv.axis[3])
+            LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB")
+            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
+            # print(hcl.lower(s))
+            # sys.exit()
             # s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
         elif layer == "maxpool2":
             s[s_layer].pipeline(s_layer.axis[2])
@@ -232,10 +249,16 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             # s[s_fc2].pipeline(s_fc2.axis[1])
             s[s_fc2].pipeline(s_fc2.axis[1])
 
-    if isinstance(target,hcl.platform):
-        s.to([input_image] + hcl_ph, target.xcel)
-        s.to(build_packed_bnn.fc2, target.host)
-        target.config(compile="vivado_hls", mode="csyn")
+    target = "vhls"
+    f = hcl.build(s, target=target)
+    print(f)
+    # with open("vhls_code.cpp","w") as outfile:
+    #     outfile.write(f)
+    # sys.exit()
+    # if isinstance(target,hcl.platform):
+    #     s.to([input_image] + hcl_ph, target.xcel)
+    #     s.to(build_packed_bnn.fc2, target.host)
+    #     target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 
@@ -255,6 +278,7 @@ if __name__ == '__main__':
             hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
         hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
         f = build_bitpacked_bnn_inf()
+        print("Finish building function.")
 
     correct_sum = 0
     for i in range(num_images // batch_size):
