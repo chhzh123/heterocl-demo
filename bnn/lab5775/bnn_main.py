@@ -190,24 +190,25 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     print(build_packed_bnn.__dict__.keys())
     for layer in build_packed_bnn.__dict__.keys():
         s_layer = getattr(build_packed_bnn,layer)
-        if "pad" in layer:
+        if layer == "conv1_pad":
+            s[s_layer].pipeline(s_layer.axis[2])
+        elif layer == "conv2_pad":
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "bn1": # fuse conv
             s_conv = build_packed_bnn.conv1
-            s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
-            s[s_layer].pipeline(s_layer.axis[2])
+            s[s_conv].pipeline(s_conv.axis[3])
+            # s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
+            s[s_layer].pipeline(s_layer.axis[3])
             # s_packed = build_packed_bnn.packed_bn1
             # s[s_layer].compute_at(s[s_packed],s_packed.axis[3])
-        # elif layer in ["pack2"]:
-        #     s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "maxpool1":
             s[s_layer].pipeline(s_layer.axis[2])
         elif layer == "bn2":
             s_conv = build_packed_bnn.conv2
             s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
             s[s_conv].pipeline(s_conv.axis[3])
-            LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB")
-            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
+            # LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB")
+            # WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
             # print(hcl.lower(s))
             # sys.exit()
             # s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
@@ -215,46 +216,38 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_layer].pipeline(s_layer.axis[2])
         elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
-        elif layer == "flatten":
-            # x_out, x_in = s[s_layer].split(s_layer.axis[1], 32)
-            s_pack = build_packed_bnn.pack
-            # s[s_layer].compute_at(s[s_pack],s_pack.axis[1])
-            s[s_pack].pipeline(s_pack.axis[1])
+        elif layer == "packed_flatten":
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "fc1_xor":
             s[s_layer].pipeline(s_layer.axis[1])
-            s_popcnt = build_packed_bnn.fc1_popcount
-            # s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
-            s[s_popcnt].pipeline(s_popcnt.axis[1])
-            s_matmal = build_packed_bnn.fc1_matmul
-            s[s_matmal].pipeline(s_matmal.axis[1])
-            # s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
+            s_matmul = build_packed_bnn.fc1_matmul
+            s[s_matmul].pipeline(s_matmul.axis[2])
             s_bias = build_packed_bnn.fc1_bias
             s[s_bias].pipeline(s_bias.axis[1])
-            s[s_matmal].compute_at(s[s_bias],s_bias.axis[1])
-            s[s_matmal].pipeline(s_matmal.axis[1])
             s_fc1 = build_packed_bnn.fc1
             # s[s_bias].compute_at(s[s_fc1],s_fc1.axis[1])
             s[s_fc1].pipeline(s_fc1.axis[1])
         elif layer == "fc2_xor":
             s[s_layer].pipeline(s_layer.axis[1])
-            s_popcnt = build_packed_bnn.fc2_popcount
-            s[s_popcnt].pipeline(s_popcnt.axis[1])
-            # s[s_layer].compute_at(s[s_popcnt],s_popcnt.axis[2])
-            s_matmal = build_packed_bnn.fc2_matmul
-            s[s_matmal].pipeline(s_matmal.axis[1])
-            # s[s_popcnt].compute_at(s[s_matmal],s_matmal.axis[2])
+            s_matmul = build_packed_bnn.fc2_matmul
+            s[s_matmul].pipeline(s_matmul.axis[1])
             s_fc2 = build_packed_bnn.fc2
-            # s[s_matmal].compute_at(s[s_fc2],s_fc2.axis[1])
-            # s[s_fc2].pipeline(s_fc2.axis[1])
             s[s_fc2].pipeline(s_fc2.axis[1])
 
     target = "vhls"
     f = hcl.build(s, target=target)
-    print(f)
-    # with open("vhls_code.cpp","w") as outfile:
-    #     outfile.write(f)
-    # sys.exit()
+    # print(f)
+    cnt = 1
+    res_f = ""
+    for line in f.split("\n"):
+        if line[:5] == "  for":
+            res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
+            cnt += 1
+        else:
+            res_f += line + "\n"
+    with open("vhls_code.cpp","w") as outfile:
+        outfile.write(res_f)
+    sys.exit()
     # if isinstance(target,hcl.platform):
     #     s.to([input_image] + hcl_ph, target.xcel)
     #     s.to(build_packed_bnn.fc2, target.host)
