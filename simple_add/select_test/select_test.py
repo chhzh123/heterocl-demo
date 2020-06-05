@@ -23,5 +23,18 @@ def test2():
 	with open("select_test.cpp","w") as outfile:
 		outfile.write(f)
 
+def test3():
+	A = hcl.placeholder((8, 8), "A", dtype=hcl.UInt(2))
+	B = hcl.placeholder((8, 8), "B", dtype=hcl.UInt(2))
+	def kernel(A, B):
+	    return hcl.compute((8, 8), lambda y, x: 
+	        hcl.select(x < 4, A[y, x][0], 0), "C")
+	s = hcl.create_scheme([A, B], kernel)
+	s = hcl.create_schedule_from_scheme(s)
+	f = hcl.build(s)
+	print(f)
+
 if __name__ == '__main__':
-	test2()
+	# test1()
+	# test2()
+	test3()
