@@ -31,7 +31,7 @@ def test3():
 	        hcl.select(x < 4, A[y, x][0], 0), "C")
 	s = hcl.create_scheme([A, B], kernel)
 	s = hcl.create_schedule_from_scheme(s)
-	f = hcl.build(s)
+	f = hcl.build(s, "vhls")
 	print(f)
 
 if __name__ == '__main__':

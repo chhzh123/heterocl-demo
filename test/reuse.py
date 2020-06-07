@@ -77,17 +77,14 @@ def test_reuse_compute2():
     hcl.init()
     ph_A = hcl.placeholder((10, 10),name="A")
     ph_C = hcl.placeholder((10, 8),name="C")
-    ph_B = None
     def kernel(A):
-        nonlocal ph_B
         B = hcl.compute((10, 10), lambda y, x: A[y, x], "B")
-        ph_B = B
         C = hcl.compute((10, 8), lambda y, x: B[y, x] + B[y, x+1] + B[y, x+2], "C")
         return C
     target = hcl.platform.zc706
     # target = None
     s = hcl.create_schedule([ph_A], kernel)
-    RB = s.reuse_at(ph_B, s[kernel.C], kernel.C.axis[1])
+    RB = s.reuse_at(kernel.B._op, s[kernel.C], kernel.C.axis[1])
     s.to(kernel.B, target.xcel)
     s.to(kernel.C, target.host)
     print(hcl.lower(s))
@@ -97,8 +94,8 @@ def test_reuse_compute2():
 # test_reuse_blur_x()
 # test_tutorial()
 # test_reuse_compute()
-# test_reuse_compute2()
-test_reuse_blur_x_with_to()
+test_reuse_compute2()
+# test_reuse_blur_x_with_to()
 
 # hcl_Bxy = hcl.asarray(np.zeros((4, 4)))
 # f = hcl.build(s_xy)

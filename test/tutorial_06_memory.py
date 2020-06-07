@@ -245,6 +245,9 @@ print(hcl.lower(s_final))
 # Finally, we can generate the HLS code and see if the II is indeed 1.
 
 f = hcl.build(s_final, target="vhls")
+print(f)
+import sys
+sys.exit()
 
 ##############################################################################
 # Following is a sample report from Vivado_HLS.
