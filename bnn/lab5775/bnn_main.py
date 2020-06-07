@@ -39,8 +39,7 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
     maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=False) # 16*8*8
 
     if PACK_CONV:
-        w = hcl.pack(w_conv2, axis=1, factor=16, dtype=hcl.UInt(16), name="w")
-        conv2 = bnn.packed_conv2d_nchw(maxpool1, w, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+        conv2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     else:
         conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
@@ -55,11 +54,6 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
     fc2 = bnn.packed_dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256/32->10
     return fc2
 
-def packbits(arr, bitwidth):
-    assert arr.dtype == np.bool, \
-        "A bool array is needed"
-    return np.packbits(arr,axis=1,bitorder="little").view(np.uint32)
-
 # prepare numpy arrays for testing
 data = np.load("data/bnn-5775.data.npz")
 images = data["images"][:test_size]
@@ -73,9 +67,13 @@ params = np.load("data/bnn-5775.params.npz")
 packed_params = {}
 for name in params:
     if "w_fc" in name:
-        packed_params[name] = packbits(params[name].copy().astype(np.bool),32)
-    # elif "w_conv2" in name:
-        # packed_params[name] = np.packbits(arr,axis=1,bitorder="little").view(np.uint16)
+        packed_params[name] = np.packbits(params[name].copy().astype(np.bool),
+            axis=1,bitorder="little").view(np.uint32)
+    elif "w_conv2" in name:
+        arr = params[name].copy().transpose(0,2,3,1)
+        arr = np.packbits(arr.astype(np.bool),
+                axis=3,bitorder="little").view(np.uint16)
+        packed_params[name] = arr.transpose(0,3,1,2)
     else:
         packed_params[name] = params[name].copy()
 
@@ -157,7 +155,10 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     hcl_ph = []
     input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in packed_params:
-        dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+        if "w_conv2" in name:
+            dtype = hcl.UInt(16)
+        else:
+            dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
         hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
 
     # build the network
@@ -176,7 +177,10 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     hcl_ph = []
     input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in packed_params:
-        dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+        if "w_conv2" in name:
+            dtype = hcl.UInt(16)
+        else:
+            dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
         hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
 
     # build the network
@@ -264,7 +268,10 @@ if __name__ == '__main__':
     else:
         hcl_array = []
         for name in packed_params:
-            dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+            if "w_conv2" in name:
+                dtype = hcl.UInt(16)
+            else:
+                dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
             hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
         hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
         f = build_bitpacked_bnn_inf()

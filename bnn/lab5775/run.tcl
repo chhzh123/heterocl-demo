@@ -10,11 +10,10 @@ set hls_prj out.prj
 open_project ${hls_prj} -reset
 
 # Top function of the design is "top"
-set_top test
+set_top default_function
 
 # Add design and testbench files
-add_files kernel.cpp
-add_files -tb host.cpp -cflags "-std=gnu++0x"
+add_files vhls_code.cpp
 
 open_solution "solution1"
 # Use Zynq device
@@ -28,6 +27,12 @@ create_clock -period 10
 ############################################
 
 # Simulate the C++ design
-csim_design -O
+#csim_design -O
+# Synthesize the design
+csynth_design
+# Co-simulate the design
+#cosim_design
+# Implement the design
+#export_design -flow impl
 
 exit
