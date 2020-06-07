@@ -34,14 +34,11 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_conv2, bn_t2,
                      w_fc1, b_fc1,
                      w_fc2, b_fc2): # 1*16*16
-    if PACK_CONV:
-        conv1 = bnn.packed_conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
-    else:
-        conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
+    conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
     bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=True) # 16*8*8
+    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=False) # 16*8*8
 
-    if False:
+    if PACK_CONV:
         w = hcl.pack(w_conv2, axis=1, factor=16, dtype=hcl.UInt(16), name="w")
         conv2 = bnn.packed_conv2d_nchw(maxpool1, w, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     else:
@@ -234,24 +231,24 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
 
-    target = "vhls"
-    f = hcl.build(s, target=target)
+    # target = "vhls"
+    # f = hcl.build(s, target=target)
     # print(f)
-    cnt = 1
-    res_f = ""
-    for line in f.split("\n"):
-        if line[:5] == "  for":
-            res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
-            cnt += 1
-        else:
-            res_f += line + "\n"
-    with open("vhls_code.cpp","w") as outfile:
-        outfile.write(res_f)
-    sys.exit()
-    # if isinstance(target,hcl.platform):
-    #     s.to([input_image] + hcl_ph, target.xcel)
-    #     s.to(build_packed_bnn.fc2, target.host)
-    #     target.config(compile="vivado_hls", mode="csyn")
+    # cnt = 1
+    # res_f = ""
+    # for line in f.split("\n"):
+    #     if line[:5] == "  for":
+    #         res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
+    #         cnt += 1
+    #     else:
+    #         res_f += line + "\n"
+    # with open("vhls_code.cpp","w") as outfile:
+    #     outfile.write(res_f)
+    # sys.exit()
+    if isinstance(target,hcl.platform):
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_packed_bnn.fc2, target.host)
+        target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 
