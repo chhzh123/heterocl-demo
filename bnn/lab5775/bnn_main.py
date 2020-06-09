@@ -35,15 +35,15 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_fc1, b_fc1,
                      w_fc2, b_fc2): # 1*16*16
     conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
-    bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
-    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=False) # 16*8*8
+    bn1 = bnn.packed_batch_norm_threshold(conv1, bn_t1, name="bn1")
+    maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=not PACK_CONV) # 16*8*8
 
     if PACK_CONV:
         conv2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
     else:
         conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
-    bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
-    maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2",unpack=False) # 32*4*4=512
+    bn2 = bnn.packed_batch_norm_threshold(conv2, bn_t2, name="bn2")
+    maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2",unpack=not PACK_CONV) # 32*4*4=512
 
     if PACK_CONV:
         pack = bnn.packed_flatten(maxpool2,name="packed_flatten")

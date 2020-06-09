@@ -18,7 +18,7 @@
 #include "kernel.h"
 
 int main(int argc, char ** argv) {
-  uint8_t* arg_0 = (uint8_t*)shmat(42270749, nullptr, 0);
+  uint8_t* arg_0 = (uint8_t*)shmat(43909149, nullptr, 0);
   uint8_t* input_image = new uint8_t[1 * 1 * 16 * 16];
   for (size_t i0 = 0; i0 < 1; i0++) {
     for (size_t i1 = 0; i1 < 1; i1++) {
@@ -30,7 +30,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  uint8_t* arg_1 = (uint8_t*)shmat(42303520, nullptr, 0);
+  uint8_t* arg_1 = (uint8_t*)shmat(43941920, nullptr, 0);
   uint8_t* w_conv1 = new uint8_t[16 * 1 * 3 * 3];
   for (size_t i0 = 0; i0 < 16; i0++) {
     for (size_t i1 = 0; i1 < 1; i1++) {
@@ -42,7 +42,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_2 = (int32_t*)shmat(42336292, nullptr, 0);
+  int32_t* arg_2 = (int32_t*)shmat(43974692, nullptr, 0);
   int32_t* bn_t1 = new int32_t[16 * 16 * 16];
   for (size_t i0 = 0; i0 < 16; i0++) {
     for (size_t i1 = 0; i1 < 16; i1++) {
@@ -52,7 +52,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  uint8_t* arg_3 = (uint8_t*)shmat(42369062, nullptr, 0);
+  uint8_t* arg_3 = (uint8_t*)shmat(44007462, nullptr, 0);
   uint8_t* w_conv2 = new uint8_t[32 * 1 * 3 * 3];
   for (size_t i0 = 0; i0 < 32; i0++) {
     for (size_t i1 = 0; i1 < 1; i1++) {
@@ -64,7 +64,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_4 = (int32_t*)shmat(42401832, nullptr, 0);
+  int32_t* arg_4 = (int32_t*)shmat(44040232, nullptr, 0);
   int32_t* bn_t2 = new int32_t[32 * 8 * 8];
   for (size_t i0 = 0; i0 < 32; i0++) {
     for (size_t i1 = 0; i1 < 8; i1++) {
@@ -74,7 +74,7 @@ int main(int argc, char ** argv) {
     }
   }
 
-  uint32_t* arg_5 = (uint32_t*)shmat(42434601, nullptr, 0);
+  uint32_t* arg_5 = (uint32_t*)shmat(44073001, nullptr, 0);
   uint32_t* w_fc1 = new uint32_t[256 * 16];
   for (size_t i0 = 0; i0 < 256; i0++) {
     for (size_t i1 = 0; i1 < 16; i1++) {
@@ -82,13 +82,13 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_6 = (int32_t*)shmat(42467376, nullptr, 0);
+  int32_t* arg_6 = (int32_t*)shmat(44105776, nullptr, 0);
   int32_t* b_fc1 = new int32_t[256];
   for (size_t i0 = 0; i0 < 256; i0++) {
     b_fc1[i0] = (int32_t)(arg_6[i0]) >> 10;
   }
 
-  uint32_t* arg_7 = (uint32_t*)shmat(42500147, nullptr, 0);
+  uint32_t* arg_7 = (uint32_t*)shmat(44138547, nullptr, 0);
   uint32_t* w_fc2 = new uint32_t[10 * 8];
   for (size_t i0 = 0; i0 < 10; i0++) {
     for (size_t i1 = 0; i1 < 8; i1++) {
@@ -96,13 +96,13 @@ int main(int argc, char ** argv) {
     }
   }
 
-  int32_t* arg_8 = (int32_t*)shmat(42532923, nullptr, 0);
+  int32_t* arg_8 = (int32_t*)shmat(44171323, nullptr, 0);
   int32_t* b_fc2 = new int32_t[10];
   for (size_t i0 = 0; i0 < 10; i0++) {
     b_fc2[i0] = (int32_t)(arg_8[i0]) >> 10;
   }
 
-  int32_t* arg_9 = (int32_t*)shmat(42565692, nullptr, 0);
+  int32_t* arg_9 = (int32_t*)shmat(44204092, nullptr, 0);
   int32_t* fc2 = new int32_t[1 * 10];
   for (size_t i0 = 0; i0 < 1; i0++) {
     for (size_t i1 = 0; i1 < 10; i1++) {
@@ -145,15 +145,15 @@ int main(int argc, char ** argv) {
       }
     }
   }
+  hls::stream<ap_fixed<20, 10> > b_fc1_channel;
+  for (ap_int<32> b_fc10 = 0; b_fc10 < 256; ++b_fc10) {
+    b_fc1_channel.write(b_fc1[b_fc10]);
+  }
   hls::stream<ap_uint<32> > w_fc2_channel;
   for (ap_int<32> w_fc20 = 0; w_fc20 < 10; ++w_fc20) {
     for (ap_int<32> w_fc21 = 0; w_fc21 < 8; ++w_fc21) {
       w_fc2_channel.write(w_fc2[(w_fc21 + (w_fc20 * 8))]);
     }
-  }
-  hls::stream<ap_fixed<20, 10> > b_fc1_channel;
-  for (ap_int<32> b_fc10 = 0; b_fc10 < 256; ++b_fc10) {
-    b_fc1_channel.write(b_fc1[b_fc10]);
   }
   hls::stream<ap_fixed<20, 10> > bn_t2_channel;
   for (ap_int<32> bn_t20 = 0; bn_t20 < 32; ++bn_t20) {
@@ -172,7 +172,7 @@ int main(int argc, char ** argv) {
     }
   }
   hls::stream<ap_fixed<20, 10> > fc2_channel;
-  test(b_fc2_channel, w_conv1_channel, input_image_channel, bn_t1_channel, w_conv2_channel, bn_t2_channel, w_fc1_channel, b_fc1_channel, w_fc2_channel, fc2_channel);
+  test(w_fc2_channel, b_fc1_channel, w_fc1_channel, bn_t2_channel, w_conv2_channel, bn_t1_channel, w_conv1_channel, input_image_channel, b_fc2_channel, fc2_channel);
   for (ap_int<32> fc21 = 0; fc21 < 10; ++fc21) {
     fc2[fc21] = fc2_channel.read();
   }
