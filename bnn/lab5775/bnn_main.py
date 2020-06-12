@@ -40,9 +40,10 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
 
     if PACK_CONV:
         conv2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+        bn2 = bnn.packed_batch_norm_threshold(conv2, bn_t2, name="bn2")
     else:
         conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
-    bn2 = bnn.packed_batch_norm_threshold(conv2, bn_t2, name="bn2")
+        bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
     maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2",unpack=not PACK_CONV) # 32*4*4=512
 
     if PACK_CONV:
@@ -69,7 +70,7 @@ for name in params:
     if "w_fc" in name:
         packed_params[name] = np.packbits(params[name].copy().astype(np.bool),
             axis=1,bitorder="little").view(np.uint32)
-    elif "w_conv2" in name:
+    elif "w_conv2" in name and PACK_CONV:
         arr = params[name].copy().transpose(0,2,3,1)
         arr = np.packbits(arr.astype(np.bool),
                 axis=3,bitorder="little").view(np.uint16)
@@ -155,7 +156,7 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     hcl_ph = []
     input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in packed_params:
-        if "w_conv2" in name:
+        if "w_conv2" in name and PACK_CONV:
             dtype = hcl.UInt(16)
         else:
             dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
@@ -177,7 +178,7 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     hcl_ph = []
     input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in packed_params:
-        if "w_conv2" in name:
+        if "w_conv2" in name and PACK_CONV:
             dtype = hcl.UInt(16)
         else:
             dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
@@ -268,7 +269,7 @@ if __name__ == '__main__':
     else:
         hcl_array = []
         for name in packed_params:
-            if "w_conv2" in name:
+            if "w_conv2" in name and PACK_CONV:
                 dtype = hcl.UInt(16)
             else:
                 dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
