@@ -6,28 +6,7 @@ from bnn_main import *
 
 batch_size = 1
 target = hcl.platform.zc706
-
-# add HLS pragmas manually
-def add_array_partition(f):
-	res_f = ""
-	lines = f.split("\n")
-	for i,line in enumerate(lines):
-		if "default_function" in line:
-			break
-	pragmas = []
-	for var in ["input_image",
-				"w_conv1","bn_t1",
-				"w_conv2","bn_t2",
-				"w_fc1","b_fc1",
-				"w_fc2","b_fc2",
-				"fc2"]:
-		if var not in ["b_fc2","fc2"]:
-			pragmas.append("#pragma HLS array_partition variable={} block factor=8 dim=1".format(var))
-		else:
-			pragmas.append("#pragma HLS array_partition variable={} complete dim=1".format(var))
-	lines = lines[:i+1] + pragmas + lines[i+1:]
-	res_f += "\n".join(lines)
-	return res_f
+target.config(compile="vivado_hls", mode="csyn")
 
 hcl_array = []
 hcl_image = hcl.asarray(images[:batch_size], dtype=qtype_bit)
@@ -38,12 +17,15 @@ if len(sys.argv) == 1 or sys.argv[1] == 2:
 		hcl_array.append(hcl.asarray(params[name],dtype=dtype))
 else:
 	for name in packed_params:
-		dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
+		if "w_conv2" in name and PACK_CONV:
+			dtype = hcl.UInt(16)
+		else:
+			dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
 		hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
 
 def parse_report():
-	# hcl.report.parse_xml("project",True)
-	report = f.report(target)
+	report = hcl.report.parse_xml("project",True)
+	# report = f.report(target)
 	overall = 0
 	loop_num = open("project/kernel.cpp","r").read().count("LOOP")
 	for i in range(10,loop_num):

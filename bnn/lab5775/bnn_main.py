@@ -184,6 +184,11 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
         hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
 
+    w_conv_ph = []
+    for i,name in enumerate(packed_params):
+        if "w_conv" in name:
+            w_conv_ph.append(hcl_ph[i])
+
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_packed_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
@@ -194,26 +199,30 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
             s[s_layer].pipeline(s_layer.axis[2])
+            s.partition(input_image)
         elif layer == "conv2_pad":
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[2])
         elif layer == "bn1": # fuse conv
             s_conv = build_packed_bnn.conv1
             s[s_conv].pipeline(s_conv.axis[3])
-            # s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
             s[s_layer].pipeline(s_layer.axis[3])
-            # s_packed = build_packed_bnn.packed_bn1
-            # s[s_layer].compute_at(s[s_packed],s_packed.axis[3])
+            LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_conv],s_conv.axis[2], "LB")
+            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
+            s.partition(LB, dim=3)
+            s.partition(WB)
+            s.partition(w_conv_ph[0])
+            # s.partition(build_packed_bnn.conv1._op)
         elif layer == "maxpool1":
             s[s_layer].pipeline(s_layer.axis[2])
         elif layer == "bn2":
             s_conv = build_packed_bnn.conv2
             s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
             s[s_conv].pipeline(s_conv.axis[3])
-            # LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB")
-            # WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
-            # print(hcl.lower(s))
-            # sys.exit()
-            # s[s_conv].compute_at(s[s_layer],s_layer.axis[3])
+            LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB")
+            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
+            s.partition(LB, dim=3)
+            s.partition(WB)
+            s.partition(w_conv_ph[1])
         elif layer == "maxpool2":
             s[s_layer].pipeline(s_layer.axis[2])
         elif "unpack" in layer:
@@ -236,20 +245,39 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
 
-    # target = "vhls"
-    # f = hcl.build(s, target=target)
-    # print(f)
-    # cnt = 1
-    # res_f = ""
-    # for line in f.split("\n"):
-    #     if line[:5] == "  for":
-    #         res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
-    #         cnt += 1
-    #     else:
-    #         res_f += line + "\n"
-    # with open("vhls_code.cpp","w") as outfile:
-    #     outfile.write(res_f)
-    # sys.exit()
+    target = "vhls"
+    f = hcl.build(s, target=target)
+    def add_loop_label(f):
+        cnt = 1
+        res_f = ""
+        for line in f.split("\n"):
+            if line[:5] == "  for":
+                res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
+                cnt += 1
+            else:
+                res_f += line + "\n"
+        return res_f
+    def add_array_partition(f): # add HLS pragmas manually
+        res_f = ""
+        lines = f.split("\n")
+        res_lines = []
+        for i,line in enumerate(lines):
+            res_lines.append(line)
+            if "default_function" not in line:
+                tensors = ["conv1_pad","conv1","bn1","conv2","conv2_pad","bn2","fc2_xor"]
+                for tensor in tensors:
+                    if "> {}[".format(tensor) in line:
+                        pragma = "  #pragma HLS array_partition variable={} complete dim=0".format(tensor)
+                        res_lines.append(pragma)
+                        break
+        res_f += "\n".join(res_lines)
+        return res_f
+    f = add_loop_label(f)
+    f = add_array_partition(f)
+    with open("vhls_code.cpp","w") as outfile:
+        outfile.write(f)
+    sys.exit()
+
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
         s.to(build_packed_bnn.fc2, target.host)
