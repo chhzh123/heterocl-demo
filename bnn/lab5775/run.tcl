@@ -9,8 +9,8 @@ set hls_prj out.prj
 # Open/reset the project
 open_project ${hls_prj} -reset
 
-# Top function of the design is "top"
-set_top default_function
+# Top function of the design is "test"
+set_top test
 
 # Add design and testbench files
 add_files vhls_code.cpp

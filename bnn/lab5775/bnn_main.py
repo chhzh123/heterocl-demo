@@ -34,13 +34,19 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_conv2, bn_t2,
                      w_fc1, b_fc1,
                      w_fc2, b_fc2): # 1*16*16
-    conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1",out_dtype=qtype_int) # 16*16*16
-    bn1 = bnn.packed_batch_norm_threshold(conv1, bn_t1, name="bn1")
+    if PACK_CONV:
+        conv1 = bnn.packed_conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1", out_dtype=qtype_int) # 16*16*16
+        bn1 = bnn.packed_batch_norm_threshold(conv1, bn_t1, name="bn1")
+        # bn1 = bnn.packed_conv2d_nchw(input_image, w_conv1, threshold=bn_t1, padding=[1,1], name="conv1", out_dtype=qtype_int) # 16*16*16
+    else:
+        conv1 = bnn.conv2d_nchw(input_image, w_conv1, padding=[1,1], name="conv1", out_dtype=qtype_int) # 16*16*16
+        bn1 = bnn.batch_norm_threshold(conv1, bn_t1, name="bn1")
     maxpool1 = bnn.packed_max_pool2d_nchw(bn1, [2,2], [2,2], name="maxpool1",unpack=not PACK_CONV) # 16*8*8
 
     if PACK_CONV:
-        conv2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
+        conv2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2", out_dtype=qtype_int) # 32*8*8
         bn2 = bnn.packed_batch_norm_threshold(conv2, bn_t2, name="bn2")
+        # bn2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, threshold=bn_t2, padding=[1,1],  name="conv2", out_dtype=qtype_int) # 32*8*8
     else:
         conv2 = bnn.conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2",out_dtype=qtype_int) # 32*8*8
         bn2 = bnn.batch_norm_threshold(conv2, bn_t2, name="bn2")
@@ -176,6 +182,7 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
 def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     # prepare placeholder
     hcl_ph = []
+    ph_dict = {}
     input_image = hcl.placeholder((batch_size,1,16,16),"input_image",qtype_bit)
     for name in packed_params:
         if "w_conv2" in name and PACK_CONV:
@@ -183,11 +190,7 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         else:
             dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
         hcl_ph.append(hcl.placeholder(packed_params[name].shape,name,dtype=dtype))
-
-    w_conv_ph = []
-    for i,name in enumerate(packed_params):
-        if "w_conv" in name:
-            w_conv_ph.append(hcl_ph[i])
+        ph_dict[name] = hcl_ph[-1]
 
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_packed_bnn)
@@ -202,7 +205,7 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s.partition(input_image)
         elif layer == "conv2_pad":
             s[s_layer].pipeline(s_layer.axis[2])
-        elif layer == "bn1": # fuse conv
+        elif layer == "bn1":
             s_conv = build_packed_bnn.conv1
             s[s_conv].pipeline(s_conv.axis[3])
             s[s_layer].pipeline(s_layer.axis[3])
@@ -210,7 +213,8 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
             s.partition(LB, dim=3)
             s.partition(WB)
-            s.partition(w_conv_ph[0])
+            s.partition(ph_dict["w_conv1"])
+            s.partition(ph_dict["bn_t1"],dim=1)
             # s.partition(build_packed_bnn.conv1._op)
         elif layer == "maxpool1":
             s[s_layer].pipeline(s_layer.axis[2])
@@ -222,26 +226,20 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
             s.partition(LB, dim=3)
             s.partition(WB)
-            s.partition(w_conv_ph[1])
+            s.partition(ph_dict["w_conv2"])
+            s.partition(ph_dict["bn_t2"],dim=1)
         elif layer == "maxpool2":
             s[s_layer].pipeline(s_layer.axis[2])
         elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "packed_flatten":
             s[s_layer].pipeline(s_layer.axis[1])
-        elif layer == "fc1_xor":
-            s[s_layer].pipeline(s_layer.axis[1])
-            s_matmul = build_packed_bnn.fc1_matmul
-            s[s_matmul].pipeline(s_matmul.axis[2])
-            s_bias = build_packed_bnn.fc1_bias
-            s[s_bias].pipeline(s_bias.axis[1])
+        elif layer == "fc1_matmul":
+            s[s_layer].pipeline(s_layer.axis[2])
             s_fc1 = build_packed_bnn.fc1
-            # s[s_bias].compute_at(s[s_fc1],s_fc1.axis[1])
             s[s_fc1].pipeline(s_fc1.axis[1])
-        elif layer == "fc2_xor":
-            s[s_layer].pipeline(s_layer.axis[1])
-            s_matmul = build_packed_bnn.fc2_matmul
-            s[s_matmul].pipeline(s_matmul.axis[1])
+        elif layer == "fc2_matmul":
+            s[s_layer].pipeline(s_layer.axis[2])
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
 
@@ -264,12 +262,16 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         for i,line in enumerate(lines):
             res_lines.append(line)
             if "default_function" not in line:
-                tensors = ["conv1_pad","conv1","bn1","conv2","conv2_pad","bn2","fc2_xor"]
+                tensors = ["conv1_pad","conv1","bn1","maxpool1",
+                           "conv2_pad","conv2","bn2","maxpool2"]
                 for tensor in tensors:
                     if "> {}[".format(tensor) in line:
-                        pragma = "  #pragma HLS array_partition variable={} complete dim=0".format(tensor)
+                        dim = 4 if tensor not in ["conv1","conv2"] else 2
+                        pragma = "  #pragma HLS array_partition variable={} complete dim={}".format(tensor,dim)
                         res_lines.append(pragma)
                         break
+            else:
+                res_lines[-1] = res_lines[-1].replace("default_function","test")
         res_f += "\n".join(res_lines)
         return res_f
     f = add_loop_label(f)

@@ -23,20 +23,25 @@ else:
 			dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
 		hcl_array.append(hcl.asarray(packed_params[name],dtype=dtype))
 
-def parse_report():
-	report = hcl.report.parse_xml("project",True)
+def parse_report(host_flag=True):
+	path = "project" if host_flag else ""
+	report = hcl.report.parse_xml(path,True)
 	# report = f.report(target)
 	overall = 0
-	loop_num = open("project/kernel.cpp","r").read().count("LOOP")
-	for i in range(10,loop_num):
+	loop_num = open("project/kernel.cpp" if host_flag else "vhls_code.cpp","r").read().count("LOOP")
+	beg = 10 if host_flag else 1
+	end = loop_num if host_flag else loop_num + 1
+	for i in range(beg,end):
 		try:
-			latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}".format(i)]["Latency"]
+			loop = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}".format(i)]
 		except:
 			try:
-				latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["Loop{}".format(i)]["Latency"]
+				loop = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["Loop{}".format(i)]
 			except:
-				latency = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}_L".format(i)]["Latency"]
-		print("Loop {}: {}".format(i,latency))
+				loop = report["PerformanceEstimates"]["SummaryOfLoopLatency"]["LOOP{}_L".format(i)]
+		latency = loop["Latency"]
+		II = loop["PipelineII"]
+		print("Loop {}: {}\tII: {}".format(i,latency,II))
 		overall += int(latency)
 	print("Overall: {}".format(overall))
 
@@ -54,8 +59,8 @@ elif sys.argv[1] == "3":
 	f(hcl_image, *hcl_array, hcl_out)
 	parse_report()
 elif sys.argv[1] == "4":
-	f = build_bitpacked_bnn_inf_opt(batch_size,target)
-	f(hcl_image, *hcl_array, hcl_out)
-	parse_report()
+	# f = build_bitpacked_bnn_inf_opt(batch_size,target)
+	# f(hcl_image, *hcl_array, hcl_out)
+	parse_report(False)
 else:
 	raise RuntimeError("Not supported mode")
