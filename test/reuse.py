@@ -73,6 +73,29 @@ def test_reuse_compute():
     print(hcl.lower(s))
     f = hcl.build(s)
 
+def test_reuse_compute_nd():
+    hcl.init()
+    nz = 1
+    rx = hcl.reduce_axis(0, 3, name="rx")
+    rz = hcl.reduce_axis(0, nz, name="rz")
+    A = hcl.placeholder((nz, 10, 10),name="A")
+    B = hcl.compute((10, 8), lambda y, x: hcl.sum(A[rz, y, x+rx],axis=[rz, rx]), "B")
+    s = hcl.create_schedule([A, B])
+    RB = s.reuse_at(A, s[B], B.axis[1])
+    print(hcl.lower(s))
+    f = hcl.build(s)
+
+def test_reuse_compute_sum():
+    hcl.init()
+    rx = hcl.reduce_axis(0, 3, name="rx")
+    A = hcl.placeholder((10, 10),name="A")
+    B = hcl.compute((10, 10), lambda y, x: A[y, x], "B")
+    C = hcl.compute((10, 8), lambda y, x: hcl.sum(B[y, x+rx],axis=rx), "C")
+    s = hcl.create_schedule([A, B, C])
+    RB = s.reuse_at(B, s[C], C.axis[1])
+    print(hcl.lower(s))
+    f = hcl.build(s)
+
 def test_reuse_compute2():
     hcl.init()
     ph_A = hcl.placeholder((10, 10),name="A")
@@ -94,7 +117,9 @@ def test_reuse_compute2():
 # test_reuse_blur_x()
 # test_tutorial()
 # test_reuse_compute()
-test_reuse_compute2()
+# test_reuse_compute_sum()
+test_reuse_compute_nd()
+# test_reuse_compute2()
 # test_reuse_blur_x_with_to()
 
 # hcl_Bxy = hcl.asarray(np.zeros((4, 4)))

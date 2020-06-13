@@ -96,8 +96,7 @@ def test_csyn():
     A = hcl.placeholder((10, 32), "A")
     def kernel(A):
         B = hcl.compute(A.shape, lambda *args : A[args] + 1, "B")
-        C = hcl.compute(B.shape, lambda *args : B[args] + 1, "C")
-        return C
+        return B
 
     # 2. Create schedule
     s = hcl.create_schedule([A], kernel)
@@ -107,25 +106,54 @@ def test_csyn():
     target.config(compile="vivado_hls", mode="csyn")
 
     # 4. Data movement
-    s.to(kernel.B, target.xcel)
-    s.to(kernel.C, target.host)
+    s.to(A, target.xcel)
+    s.to(kernel.B, target.host)
 
     # 5. Build the kernel
     #    (A misleading interface here, no kernel code is generated.
     #     Only the template Tcl file is copied to the current folder.)
     f = hcl.build(s, target)
+    print("Done building")
 
     # 6. Create required arrays
-    np_A = np.random.randint(10, size=(10,32))
+    np_A = np.random.randint(0, 10, size=(10,32))
     np_B = np.zeros((10,32))
-    hcl_A = hcl.asarray(np_A)
+    hcl_A = hcl.asarray(np_A, dtype=hcl.Int(32))
     hcl_B = hcl.asarray(np_B, dtype=hcl.Int(32))
 
     # 7. Generate kernel code and do synthesis
     f(hcl_A, hcl_B)
 
+def test2():
+    if os.system("which vivado_hls >> /dev/null") != 0:
+        return 
+
+    qtype = hcl.UInt(8)
+    A = hcl.placeholder((10, 32), "A", dtype=qtype)
+    def kernel(A):
+        B = hcl.compute(A.shape, lambda x, y: A[x, y] + 1, "B", dtype=qtype)
+        return B
+        C = hcl.compute(B.shape, lambda x, y: B[x, y] + 1, "C")
+        return C
+    
+    target = hcl.platform.zc706
+    s = hcl.create_schedule([A], kernel)
+    # s.to(kernel.B,target.xcel)
+    # s.to(kernel.C,target.host)
+    target.config(compile="vivado_hls", mode="csim")
+    f = hcl.build(s, target)
+    print("Done building")
+
+    np_A = np.ones((10, 32))
+    np_C = np.zeros((10, 32))
+    hcl_A = hcl.asarray(np_A, dtype=qtype)
+    hcl_C = hcl.asarray(np_C, dtype=qtype)
+    f(hcl_A, hcl_C)
+    print("Done executing")
+
 if __name__ == '__main__':
-    test_vivado_hls()
+    # test_vivado_hls()
     # report.parse_xml("project",True)
-    # test_debug_mode()
+    test_debug_mode()
     # test_csyn()
+    # test2()
