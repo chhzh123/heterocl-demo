@@ -203,8 +203,10 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         if layer == "conv1_pad":
             s[s_layer].pipeline(s_layer.axis[2])
             s.partition(input_image)
+            s.partition(s_layer,dim=4)
         elif layer == "conv2_pad":
             s[s_layer].pipeline(s_layer.axis[2])
+            s.partition(s_layer,dim=4)
         elif layer == "bn1":
             s_conv = build_packed_bnn.conv1
             s[s_conv].pipeline(s_conv.axis[3])
@@ -215,9 +217,11 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s.partition(WB)
             s.partition(ph_dict["w_conv1"])
             s.partition(ph_dict["bn_t1"],dim=1)
-            # s.partition(build_packed_bnn.conv1._op)
+            s.partition(build_packed_bnn.conv1,dim=2)
+            s.partition(s_layer,dim=4)
         elif layer == "maxpool1":
             s[s_layer].pipeline(s_layer.axis[2])
+            s.partition(s_layer,dim=4)
         elif layer == "bn2":
             s_conv = build_packed_bnn.conv2
             s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
@@ -228,8 +232,11 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s.partition(WB)
             s.partition(ph_dict["w_conv2"])
             s.partition(ph_dict["bn_t2"],dim=1)
+            s.partition(build_packed_bnn.conv2,dim=2)
+            s.partition(s_layer,dim=4)
         elif layer == "maxpool2":
             s[s_layer].pipeline(s_layer.axis[2])
+            s.partition(s_layer,dim=4)
         elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "packed_flatten":
@@ -243,42 +250,23 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
 
-    target = "vhls"
-    f = hcl.build(s, target=target)
-    def add_loop_label(f):
-        cnt = 1
-        res_f = ""
-        for line in f.split("\n"):
-            if line[:5] == "  for":
-                res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
-                cnt += 1
-            else:
-                res_f += line + "\n"
-        return res_f
-    def add_array_partition(f): # add HLS pragmas manually
-        res_f = ""
-        lines = f.split("\n")
-        res_lines = []
-        for i,line in enumerate(lines):
-            res_lines.append(line)
-            if "default_function" not in line:
-                tensors = ["conv1_pad","conv1","bn1","maxpool1",
-                           "conv2_pad","conv2","bn2","maxpool2"]
-                for tensor in tensors:
-                    if "> {}[".format(tensor) in line:
-                        dim = 4 if tensor not in ["conv1","conv2"] else 2
-                        pragma = "  #pragma HLS array_partition variable={} complete dim={}".format(tensor,dim)
-                        res_lines.append(pragma)
-                        break
-            else:
-                res_lines[-1] = res_lines[-1].replace("default_function","test")
-        res_f += "\n".join(res_lines)
-        return res_f
-    f = add_loop_label(f)
-    f = add_array_partition(f)
-    with open("vhls_code.cpp","w") as outfile:
-        outfile.write(f)
-    sys.exit()
+    # target = "vhls"
+    # f = hcl.build(s, target=target)
+    # def add_loop_label(f):
+    #     cnt = 1
+    #     res_f = ""
+    #     for line in f.split("\n"):
+    #         if line[:5] == "  for":
+    #             res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
+    #             cnt += 1
+    #         else:
+    #             res_f += line + "\n"
+    #     return res_f
+    # f = add_loop_label(f)
+    # f = add_array_partition(f)
+    # with open("vhls_code.cpp","w") as outfile:
+    #     outfile.write(f)
+    # sys.exit()
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
