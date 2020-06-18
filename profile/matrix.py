@@ -1,8 +1,10 @@
 import heterocl as hcl
 import os, sys
 import numpy as np
+from heterocl.profiler import Profiler
 
 target = "vhls"
+profiler = Profiler()
 
 def test(): # 0.25
     dtype = hcl.UInt(16)
@@ -22,9 +24,9 @@ def test(): # 0.25
 
 def gemm(): # 166
     dtype = hcl.Float()
-    M = 1000
-    K = 1000
-    N = 1000
+    M = 64
+    K = 64
+    N = 64
     A = hcl.placeholder((M, K), "A", dtype=dtype)
     B = hcl.placeholder((K, N), "B", dtype=dtype)
     k = hcl.reduce_axis(0, K)
@@ -37,14 +39,31 @@ def gemm(): # 166
     # s.to(kernel.B,target.xcel)
     # s.to(kernel.C,target.host)
     # target.config(compile="vivado_hls", mode="csim")
-    hcl.lower(s)
+    hcl.lower(s, profiler=profiler)
+    profiler.roofline()
     # print(hcl.lower(s))
     # f = hcl.build(s, target)
     # print(f)
 
 def mv_mul():
-    pass
+    dtype = hcl.Float()
+    M = 1000
+    K = 1000
+    A = hcl.placeholder((M, K), "A", dtype=dtype)
+    B = hcl.placeholder((K,), "B", dtype=dtype)
+    k = hcl.reduce_axis(0, K)
+    def kernel(A, B):
+        C = hcl.compute((M,), lambda x: hcl.sum(A[x, k] * B[k], axis=k, dtype=dtype), "C", dtype=dtype)
+        return C
+
+    s = hcl.create_schedule([A, B], kernel)
+    # target = hcl.platform.zc706
+    # s.to(kernel.B,target.xcel)
+    # s.to(kernel.C,target.host)
+    # target.config(compile="vivado_hls", mode="csim")
+    hcl.lower(s)
 
 if __name__ == "__main__":
     # test()
     gemm()
+    # mv_mul()
