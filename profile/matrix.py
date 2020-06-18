@@ -34,25 +34,33 @@ def gemm():
         C = hcl.compute((M, N), lambda x, y: hcl.sum(A[x, k] * B[k, y], axis=k, dtype=dtype), "C", dtype=dtype)
         return C
     
-    s = hcl.create_schedule([A, B], kernel)
-    target = hcl.platform.zc706
-    s.to([A, B],target.xcel)
-    s.to(kernel.C,target.host)
-    s[kernel.C].pipeline(kernel.C.axis[1])
-    s.partition(A,hcl.Partition.Block,dim=2,factor=16)
-    s.partition(B,hcl.Partition.Block,dim=1,factor=16)
-    target.config(compile="vivado_hls", mode="csyn")
-    f = hcl.build(s, target, profiler=profiler)
+    def make_schedule(opt=False):
+        s = hcl.create_schedule([A, B], kernel)
+        target = hcl.platform.zc706
+        target.config(compile="vivado_hls", mode="csyn")
+        s.to([A, B],target.xcel)
+        s.to(kernel.C,target.host)
 
-    np_A = np.random.randint(0, 10, (M, K))
-    np_B = np.random.randint(0, 10, (K, N))
-    np_C = np.zeros((M, N))
-    hcl_A = hcl.asarray(np_A)
-    hcl_B = hcl.asarray(np_B)
-    hcl_C = hcl.asarray(np_C)
-    f(hcl_A, hcl_B, hcl_C)
+        def optimization():
+            s[kernel.C].pipeline(kernel.C.axis[1])
+            s.partition(A,hcl.Partition.Block,dim=2,factor=16)
+            s.partition(B,hcl.Partition.Block,dim=1,factor=16)
 
-    profiler.profile_report()
+        if opt:
+            optimization()
+        f = hcl.build(s, target, profiler=profiler)
+
+        np_A = np.random.randint(0, 10, (M, K))
+        np_B = np.random.randint(0, 10, (K, N))
+        np_C = np.zeros((M, N))
+        hcl_A = hcl.asarray(np_A)
+        hcl_B = hcl.asarray(np_B)
+        hcl_C = hcl.asarray(np_C)
+        f(hcl_A, hcl_B, hcl_C)
+        profiler.profile_report() # need to move into exec
+
+    make_schedule(opt=False)
+    make_schedule(opt=True)
     profiler.roofline()
 
 def mv_mul():
