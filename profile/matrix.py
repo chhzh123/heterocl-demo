@@ -57,7 +57,6 @@ def gemm():
         hcl_B = hcl.asarray(np_B)
         hcl_C = hcl.asarray(np_C)
         f(hcl_A, hcl_B, hcl_C)
-        profiler.profile_report() # need to move into exec
 
     make_schedule(opt=False)
     make_schedule(opt=True)
