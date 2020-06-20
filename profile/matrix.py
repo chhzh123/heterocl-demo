@@ -18,11 +18,11 @@ def test(): # 0.25
     # s.to(kernel.B,target.xcel)
     # s.to(kernel.C,target.host)
     # target.config(compile="vivado_hls", mode="csim")
-    hcl.lower(s)
+    hcl.lower(s, profiler=profiler)
     # f = hcl.build(s, target)
     # print(f)
 
-def gemm():
+def gemm(): # 166
     dtype = hcl.Float()
     M = 64
     K = 64
@@ -60,9 +60,9 @@ def gemm():
 
     make_schedule(opt=False)
     make_schedule(opt=True)
-    profiler.roofline()
+    profiler.roofline(filename="gemm-roofline.png")
 
-def mv_mul():
+def mv_mul(): # 0.5
     dtype = hcl.Float()
     M = 1000
     K = 1000
@@ -78,7 +78,7 @@ def mv_mul():
     # s.to(kernel.B,target.xcel)
     # s.to(kernel.C,target.host)
     # target.config(compile="vivado_hls", mode="csim")
-    hcl.lower(s)
+    hcl.lower(s, profiler=profiler)
 
 if __name__ == "__main__":
     # test()
