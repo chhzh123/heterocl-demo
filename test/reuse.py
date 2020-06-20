@@ -98,28 +98,26 @@ def test_reuse_compute_sum():
 
 def test_reuse_compute2():
     hcl.init()
-    ph_A = hcl.placeholder((10, 10),name="A")
-    ph_C = hcl.placeholder((10, 8),name="C")
+    A = hcl.placeholder((10, 10),name="A")
     def kernel(A):
         B = hcl.compute((10, 10), lambda y, x: A[y, x], "B")
         C = hcl.compute((10, 8), lambda y, x: B[y, x] + B[y, x+1] + B[y, x+2], "C")
         return C
+    s = hcl.create_schedule([A], kernel)
     target = hcl.platform.zc706
-    # target = None
-    s = hcl.create_schedule([ph_A], kernel)
-    RB = s.reuse_at(kernel.B._op, s[kernel.C], kernel.C.axis[1])
-    s.to(kernel.B, target.xcel)
-    s.to(kernel.C, target.host)
-    print(hcl.lower(s))
     target.config(compile="vivado_hls",mode="csim")
+    B_ = s.to(kernel.B, target.xcel)
+    C_ = s.to(kernel.C, target.host)
+    RB = s.reuse_at(B_, s[kernel.C], kernel.C.axis[1])
+    print(hcl.lower(s))
     f = hcl.build(s, target)
 
 # test_reuse_blur_x()
 # test_tutorial()
 # test_reuse_compute()
 # test_reuse_compute_sum()
-test_reuse_compute_nd()
-# test_reuse_compute2()
+# test_reuse_compute_nd()
+test_reuse_compute2()
 # test_reuse_blur_x_with_to()
 
 # hcl_Bxy = hcl.asarray(np.zeros((4, 4)))
