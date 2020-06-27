@@ -9,12 +9,8 @@ def test():
         C = hcl.compute(A.shape, lambda x, y: B[x][y] + 1, "C")
         return C
     s = hcl.create_schedule(A, kernel)
-    s[kernel.B].dataflow(kernel.B.axis[0])
-    s[kernel.C].pipeline(kernel.C.axis[0])
-    # s.dataflow()
-    # s.partition(A)
-    # hcl.lower(s)
-    # print(hcl.lower(s))
+    s[kernel.B].compute_at(s[kernel.C], kernel.C.axis[0])
+    s[kernel.C].dataflow(kernel.C.axis[0])
     f = hcl.build(s,"vhls")
     print(f)
 
@@ -66,7 +62,7 @@ def test_csyn():
     print(f)
 
 if __name__ == "__main__":
-    # test()
+    test()
     # test2()
-    test3()
+    # test3()
     # test_csyn()
