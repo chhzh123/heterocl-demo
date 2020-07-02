@@ -151,9 +151,90 @@ def test2():
     f(hcl_A, hcl_C)
     print("Done executing")
 
+    assert "cl::Kernel kernel(program, \"test\", &err)" in code
+
+def test_old():
+    if os.system("which vivado_hls >> /dev/null") != 0:
+        return 
+
+    hcl.init()
+    A = hcl.placeholder((10, 32), "A")
+    def kernel(A):
+        B = hcl.compute(A.shape, lambda *args : A[args] + 1, "B")
+        C = hcl.compute(A.shape, lambda *args : B[args] + 1, "C")
+        D = hcl.compute(A.shape, lambda *args : C[args] * 2, "D")
+        return D
+    
+    target = hcl.platform.zc706
+    s = hcl.create_schedule([A], kernel)
+    # s.to(kernel.B, target.xcel)
+    # s.to(kernel.C, target.host)
+    target.config(compile="vivado_hls", mode="csim")
+    f = hcl.build(s, target)
+
+    np_A = np.random.randint(10, size=(10,32))
+    np_B = np.zeros((10,32))
+
+    hcl_A = hcl.asarray(np_A)
+    hcl_B = hcl.asarray(np_B, dtype=hcl.Int(32))
+    f(hcl_A, hcl_B)
+    ret_B = hcl_B.asnumpy()
+
+    for i in range(0, 10):
+      for j in range(0, 32):
+        assert ret_B[i, j] == (np_A[i, j] + 2) *2
+
+def test_project():
+    if os.system("which vivado_hls >> /dev/null") != 0:
+        return 
+
+    dtype = hcl.Float()
+    M = 64
+    K = 64
+    N = 64
+    A = hcl.placeholder((M, K), "A", dtype=dtype)
+    B = hcl.placeholder((K, N), "B", dtype=dtype)
+    k = hcl.reduce_axis(0, K)
+    def kernel(A, B):
+        C = hcl.compute((M, N), lambda x, y: hcl.sum(A[x, k] * B[k, y], axis=k, dtype=dtype), "C", dtype=dtype)
+        return C
+    
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="csyn", project="gemm")
+
+    def make_schedule(opt=False):
+        s = hcl.create_schedule([A, B], kernel, name=("s2" if opt else "s1"))
+        s.to([A, B],target.xcel)
+        s.to(kernel.C,target.host)
+
+        def optimization():
+            s[kernel.C].pipeline(kernel.C.axis[1])
+            s.partition(A,hcl.Partition.Block,dim=2,factor=16)
+            s.partition(B,hcl.Partition.Block,dim=1,factor=16)
+
+        if opt:
+            optimization()
+        f = hcl.build(s, target)
+
+        np_A = np.random.randint(0, 10, (M, K))
+        np_B = np.random.randint(0, 10, (K, N))
+        np_C = np.zeros((M, N))
+        hcl_A = hcl.asarray(np_A)
+        hcl_B = hcl.asarray(np_B)
+        hcl_C = hcl.asarray(np_C)
+        f(hcl_A, hcl_B, hcl_C)
+        return f
+
+    f1 = make_schedule(opt=False)
+    assert os.path.isdir("gemm-s1/out.prj")
+    f2 = make_schedule(opt=True)
+    assert os.path.isdir("gemm-s2/out.prj")
+
 if __name__ == '__main__':
     # test_vivado_hls()
     # report.parse_xml("project",True)
-    test_debug_mode()
+    # test_debug_mode()
     # test_csyn()
     # test2()
+    # test_old()
+    test_project()
