@@ -34,10 +34,11 @@ def gemm(): # 166
         C = hcl.compute((M, N), lambda x, y: hcl.sum(A[x, k] * B[k, y], axis=k, dtype=dtype), "C", dtype=dtype)
         return C
     
-    def make_schedule(opt=False,project="gemm"):
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="csyn", project="gemm")
+
+    def make_schedule(opt=False):
         s = hcl.create_schedule([A, B], kernel)
-        target = hcl.platform.zc706
-        target.config(compile="vivado_hls", mode="csyn", project=project)
         s.to([A, B],target.xcel)
         s.to(kernel.C,target.host)
 
@@ -58,8 +59,8 @@ def gemm(): # 166
         hcl_C = hcl.asarray(np_C)
         f(hcl_A, hcl_B, hcl_C)
 
-    make_schedule(opt=False,project="gemm")
-    make_schedule(opt=True,project="gemm-opt")
+    make_schedule(opt=False)
+    make_schedule(opt=True)
     profiler.roofline(filename="gemm-roofline.png")
 
 def mv_mul(): # 0.5
