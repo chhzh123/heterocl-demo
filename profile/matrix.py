@@ -1,10 +1,12 @@
 import heterocl as hcl
 import os, sys
 import numpy as np
-from heterocl.profiler import Profiler
 
 target = "vhls"
-profiler = Profiler(op=[hcl.OpType.Add,hcl.OpType.Mul])
+USE_PROFILER = False
+if USE_PROFILER:
+    from heterocl.profiler import Profiler
+    profiler = Profiler(op=[hcl.OpType.Add,hcl.OpType.Mul])
 
 def test(): # 0.25
     dtype = hcl.UInt(16)
@@ -49,7 +51,10 @@ def gemm(): # 166
 
         if opt:
             optimization()
-        f = hcl.build(s, target, profiler=profiler)
+        if USE_PROFILER:
+            f = hcl.build(s, target, profiler=profiler)
+        else:
+            f = hcl.build(s, target)
 
         np_A = np.random.randint(0, 10, (M, K))
         np_B = np.random.randint(0, 10, (K, N))
@@ -61,7 +66,8 @@ def gemm(): # 166
 
     make_schedule(opt=False)
     make_schedule(opt=True)
-    profiler.roofline(filename="gemm-roofline.png")
+    if USE_PROFILER:
+        profiler.roofline(filename="gemm-roofline.png")
 
 def mv_mul(): # 0.5
     dtype = hcl.Float()
