@@ -63,9 +63,12 @@ def gemm(): # 166
         hcl_B = hcl.asarray(np_B)
         hcl_C = hcl.asarray(np_C)
         f(hcl_A, hcl_B, hcl_C)
+        return f
 
-    make_schedule(opt=False)
-    make_schedule(opt=True)
+    f1 = make_schedule(opt=False)
+    f2 = make_schedule(opt=True)
+    report1 = f1.report()
+    report2 = f2.report()
     if USE_PROFILER:
         profiler.roofline(filename="gemm-roofline.png")
 
