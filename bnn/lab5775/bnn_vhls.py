@@ -59,8 +59,9 @@ elif sys.argv[1] == "3":
 	f(hcl_image, *hcl_array, hcl_out)
 	parse_report()
 elif sys.argv[1] == "4":
-	# f = build_bitpacked_bnn_inf_opt(batch_size,target)
-	# f(hcl_image, *hcl_array, hcl_out)
+	f = build_bitpacked_bnn_inf_opt(batch_size,target)
+	print("Done building function")
+	f(hcl_image, *hcl_array, hcl_out)
 	parse_report(False)
 else:
 	raise RuntimeError("Not supported mode")
