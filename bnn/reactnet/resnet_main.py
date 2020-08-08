@@ -59,7 +59,11 @@ class BasicBlock():
             avgpool = nn.avg_pool2d_nchw(bn1, pooling=[2,2],
                                          stride=[2,2], padding=[0,0],
                                          name=self.name+"_avgpool")
-            shortcut = nn.concatenate(avgpool, avgpool, name=self.name+"_concat")
+            # dont use nn.concatenate!
+            shape = avgpool.shape
+            shortcut = hcl.compute((shape[0], shape[1]*2, shape[2], shape[3]),
+                                    lambda nn, cc, ww, hh: avgpool[nn, cc % shape[1], ww, hh],
+                                    name=self.name+"_concat")
         else:
             shortcut = x
         residual1 = hcl.compute(bn1.shape, lambda nn, cc, ww, hh:
@@ -141,7 +145,6 @@ def build_resnet20_inf(images, params, batch_size=batch_size, target=target):
     # build the network
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_resnet20)
     s = hcl.create_schedule_from_scheme(scheme)
-    print(hcl.lower(s))
 
     # if isinstance(target,hcl.platform):
     #     s.to([input_image] + hcl_ph, target.xcel)
@@ -166,8 +169,31 @@ def load_cifar10():
 params = torch.load("pretrained-models/model_react-resnet20.pt", map_location=torch.device("cpu"))
 print("Loading the data.")
 images, labels = load_cifar10()
+num_images = len(images)
 for key in params:
     if "rprelu" in key or "binarize" in key:
         params[key] = params[key].reshape(-1)
 
+hls_code = build_resnet20_inf(images, params, target="vhls")
+with open("vhls_code.cpp","w") as outfile:
+    outfile.write(hls_code)
+print("Finish generating Vivado HLS code.")
+
 resnet20 = build_resnet20_inf(images, params)
+print("Finish building function.")
+
+hcl_array = []
+for name in params:
+    hcl_array.append(hcl.asarray(params[name],dtype=qtype_float))
+hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+
+correct_sum = 0
+for i in range(num_images // batch_size):
+    np_image = images[i*batch_size:(i+1)*batch_size]
+    hcl_image = hcl.asarray(np_image, dtype=qtype_float)
+    resnet20(hcl_image, *hcl_array, hcl_out)
+    prediction = np.argmax(hcl_out.asnumpy(), axis=1)
+    correct_sum += np.sum(np.equal(prediction, labels[i*batch_size:(i+1)*batch_size]))
+    if (i+1) % 10 == 0:
+        print("Done {} batches.".format(i+1))
+print("Testing accuracy: {}".format(correct_sum / float(num_images)))
