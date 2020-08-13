@@ -8,7 +8,8 @@ import torchvision
 import torchvision.transforms as transforms
 
 target = None
-batch_size = 5
+batch_size = 20
+test_size = 100
 qtype_bit = hcl.UInt(1) # weights
 # qtype_bit = hcl.Float()
 # qtype_int = hcl.Int(6) # not unsigned!
@@ -30,9 +31,9 @@ def RPReLU(data, x0, y0, beta, name="rprelu", dtype=None):
         and beta.shape[0] == x0.shape[0]
     dtype = data.dtype if dtype == None else dtype
     return hcl.compute(data.shape, lambda nn, cc, ww, hh:
-                        hcl.select(data[nn,cc,ww,hh] > x0[cc],
-                        data[nn,cc,ww,hh] - x0[cc] + y0[cc],
-                        beta[cc] * (data[nn,cc,ww,hh] - x0[cc]) + y0[cc]),
+                        hcl.select(data[nn,cc,ww,hh] + x0[cc] > 0,
+                        data[nn,cc,ww,hh] + x0[cc],
+                        beta[cc] * (data[nn,cc,ww,hh] + x0[cc])) + y0[cc],
                         name=name, dtype=dtype)
 
 class BasicBlock():
@@ -55,17 +56,14 @@ class BasicBlock():
         return self.forward(x)
 
     def forward(self, x):
-        # return self.params["rsign1"]
         # 1st residual block
         rsign1 = RSign(x, self.params["rsign1"], name=self.name+"_rsign1", dtype=qtype_int)
         conv1 = bnn.conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
-        # conv1 = nn.conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int)
-        return conv1
         bn1, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name=self.name+"_bn1",dtype=qtype_float)
         if self.stride != 1 or self.flag:
-            avgpool = nn.avg_pool2d_nchw(bn1, pooling=[2,2],
+            avgpool = nn.avg_pool2d_nchw(x, pooling=[2,2],
                                          stride=[2,2], padding=[0,0],
-                                         name=self.name+"_avgpool")
+                                         name=self.name+"_avgpool",dtype=qtype_float)
             # dont use nn.concatenate!
             shape = avgpool.shape
             shortcut = hcl.compute((shape[0], shape[1]*2, shape[2], shape[3]),
@@ -99,7 +97,6 @@ class Sequential():
         out = x
         for layer in self.layers:
             out = layer(out)
-            return out
         return out
 
 class ResNet():
@@ -133,11 +130,11 @@ class ResNet():
         conv1 = nn.conv2d_nchw(x, self.params["conv1"], strides=[1, 1], padding=[1, 1], name="out_conv", out_dtype=qtype_float)
         bn, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name="out_bn",dtype=qtype_float)
         layer1 = self.layer1(bn)
-        return layer1
         layer2 = self.layer2(layer1)
         layer3 = self.layer3(layer2)
-        avgpool = nn.avg_pool2d_nchw(layer3, pooling=[2, 2], stride=[2, 2], padding=[0, 0], name="avgpool")
-        flat = bnn.flatten(avgpool, name="flatten")
+        kernel_size = layer3.shape[3]
+        avgpool = nn.avg_pool2d_nchw(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
+        flat = nn.flatten(avgpool, name="flatten", dtype=qtype_float)
         out = nn.dense(flat, self.params["linear"][0], bias=self.params["linear"][1], name="fc", out_dtype=qtype_float)
         return out
 
@@ -173,7 +170,7 @@ def load_cifar10():
         ])
     test_set = torchvision.datasets.CIFAR10(root='.', train=False,
                                            download=True, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=10,
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
                                              shuffle=False,
                                              num_workers=2)
     classes = ('plane', 'car', 'bird', 'cat',
@@ -185,6 +182,7 @@ print("Loading the data.")
 test_loader = load_cifar10()
 new_params = dict()
 for key in params:
+    params[key] = params[key].numpy()
     if "num_batches_tracked" in key:
         continue
     elif "rprelu" in key or "binarize" in key:
@@ -193,7 +191,6 @@ for key in params:
         temp = np.sign(params[key])
         temp[temp < 0] = 0 # change from {-1,1} to {0,1}
         new_params[key] = temp
-        print(new_params[key][0,0,:,:])
     else:
         new_params[key] = np.array(params[key])
 params = new_params
@@ -211,21 +208,18 @@ for name in params:
     dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
     # print(name,params[name].dtype,dtype,params[name].shape)
     hcl_array.append(hcl.asarray(params[name],dtype=dtype))
-    if name == "layer1.0.conv1.weight":
-        print(hcl_array[-1].asnumpy()[0,0,:,:])
 hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
-hcl_out = hcl.asarray(np.zeros((16,16,3,3)),dtype=qtype_int)
-hcl_out = hcl.asarray(np.zeros((batch_size,16,32,32)),dtype=qtype_int)
 
 correct_sum = 0
 for i, (images, labels) in enumerate(test_loader):
-    np_image = np.array(images)
+    np_image = images.numpy()
+    labels = labels.numpy()
     hcl_image = hcl.asarray(np_image, dtype=qtype_float)
     resnet20(hcl_image, *hcl_array, hcl_out)
-    print(hcl_out.asnumpy()[0,0,:,:])
     prediction = np.argmax(hcl_out.asnumpy(), axis=1)
     correct_sum += np.sum(np.equal(prediction, labels))
-    print("Done {} batches.".format(i+1))
-    # if (i+1) % 10 == 0:
-    #     print("Done {} batches.".format(i+1))
-print("Testing accuracy: {}".format(correct_sum / float(num_images)))
+    if (i+1) % 10 == 0:
+        print("Done {} batches.".format(i+1))
+    if (i+1) * batch_size == test_size:
+        break
+print("Testing accuracy: {}".format(correct_sum / float(test_size)))
