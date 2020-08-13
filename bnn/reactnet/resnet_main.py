@@ -11,12 +11,8 @@ target = None
 batch_size = 20
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
-# qtype_bit = hcl.Float()
-# qtype_int = hcl.Int(6) # not unsigned!
-qtype_int = hcl.Int(32)
-# qtype_int = hcl.Float()
-# qtype_float = hcl.Fixed(20,10)
-qtype_float = hcl.Float()
+qtype_int = hcl.Int(8)
+qtype_float = hcl.Fixed(24,12)
 # qtype_packed = hcl.UInt(32)
 
 def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
@@ -177,7 +173,7 @@ def load_cifar10():
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     return test_loader
 
-params = torch.load("pretrained-models/model_react-resnet20.pt", map_location=torch.device("cpu"))
+params = torch.load("pretrained-models/model_react-resnet20-8bitBN.pt", map_location=torch.device("cpu"))
 print("Loading the data.")
 test_loader = load_cifar10()
 new_params = dict()
@@ -206,7 +202,6 @@ print("Finish building function.")
 hcl_array = []
 for name in params:
     dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
-    # print(name,params[name].dtype,dtype,params[name].shape)
     hcl_array.append(hcl.asarray(params[name],dtype=dtype))
 hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
 
