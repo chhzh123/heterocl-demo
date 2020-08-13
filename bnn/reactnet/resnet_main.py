@@ -7,8 +7,8 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-target = None
-batch_size = 20
+target = hcl.platform.zc706
+batch_size = 1
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(8)
@@ -150,10 +150,10 @@ def build_resnet20_inf(params, batch_size=batch_size, target=target):
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_resnet20)
     s = hcl.create_schedule_from_scheme(scheme)
 
-    # if isinstance(target,hcl.platform):
-    #     s.to([input_image] + hcl_ph, target.xcel)
-    #     s.to(build_bnn.fc2, target.host)
-    #     target.config(compile="vivado_hls", mode="csyn")
+    if isinstance(target,hcl.platform):
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_resnet20.fc, target.host)
+        target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 
