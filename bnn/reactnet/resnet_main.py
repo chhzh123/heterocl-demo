@@ -7,13 +7,15 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-target = hcl.platform.zc706
-target.config(compile="vivado_hls", mode="csyn")
-batch_size = 1
+target = None
+batch_size = 10
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(8)
-qtype_float = hcl.Fixed(24,12)
+if __name__ == "__main__":
+    qtype_float = hcl.Fixed(24,12)
+else: # for interface synthesis
+    qtype_float = hcl.Fixed(32,12)
 # qtype_packed = hcl.UInt(32)
 
 def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
@@ -192,30 +194,26 @@ for key in params:
         new_params[new_key] = np.array(params[key])
 params = new_params
 
-hls_code = build_resnet20_inf(params, target="vhls")
-with open("vhls_code.cpp","w") as outfile:
-    outfile.write(hls_code)
-print("Finish generating Vivado HLS code.")
-
-resnet20 = build_resnet20_inf(params)
-print("Finish building function.")
-
 hcl_array = []
 for name in params:
     dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
     hcl_array.append(hcl.asarray(params[name],dtype=dtype))
 hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
 
-correct_sum = 0
-for i, (images, labels) in enumerate(test_loader):
-    np_image = images.numpy()
-    labels = labels.numpy()
-    hcl_image = hcl.asarray(np_image, dtype=qtype_float)
-    resnet20(hcl_image, *hcl_array, hcl_out)
-    prediction = np.argmax(hcl_out.asnumpy(), axis=1)
-    correct_sum += np.sum(np.equal(prediction, labels))
-    if (i+1) % 10 == 0:
-        print("Done {} batches.".format(i+1))
-    if (i+1) * batch_size == test_size:
-        break
-print("Testing accuracy: {}".format(correct_sum / float(test_size)))
+if __name__ == "__main__":
+    resnet20 = build_resnet20_inf(params)
+    print("Finish building function.")
+
+    correct_sum = 0
+    for i, (images, labels) in enumerate(test_loader):
+        np_image = images.numpy()
+        labels = labels.numpy()
+        hcl_image = hcl.asarray(np_image, dtype=qtype_float)
+        resnet20(hcl_image, *hcl_array, hcl_out)
+        prediction = np.argmax(hcl_out.asnumpy(), axis=1)
+        correct_sum += np.sum(np.equal(prediction, labels))
+        if (i+1) % 10 == 0:
+            print("Done {} batches.".format(i+1))
+        if (i+1) * batch_size == test_size:
+            break
+    print("Testing accuracy: {}".format(correct_sum / float(test_size)))
