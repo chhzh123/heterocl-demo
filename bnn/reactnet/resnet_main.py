@@ -8,6 +8,7 @@ import torchvision
 import torchvision.transforms as transforms
 
 target = hcl.platform.zc706
+target.config(compile="vivado_hls", mode="csyn")
 batch_size = 1
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
@@ -153,7 +154,6 @@ def build_resnet20_inf(params, batch_size=batch_size, target=target):
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
         s.to(build_resnet20.fc, target.host)
-        target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 
@@ -179,16 +179,17 @@ test_loader = load_cifar10()
 new_params = dict()
 for key in params:
     params[key] = params[key].numpy()
+    new_key = key.replace(".","_")
     if "num_batches_tracked" in key:
         continue
     elif "rprelu" in key or "binarize" in key:
-        new_params[key] = np.array(params[key]).reshape(-1)
+        new_params[new_key] = np.array(params[key]).reshape(-1)
     elif "conv" in key and "layer" in key:
         temp = np.sign(params[key])
         temp[temp < 0] = 0 # change from {-1,1} to {0,1}
-        new_params[key] = temp
+        new_params[new_key] = temp
     else:
-        new_params[key] = np.array(params[key])
+        new_params[new_key] = np.array(params[key])
 params = new_params
 
 hls_code = build_resnet20_inf(params, target="vhls")
