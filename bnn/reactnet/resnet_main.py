@@ -7,15 +7,18 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-target = None
-batch_size = 10
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(8)
 if __name__ == "__main__":
+    batch_size = 10
     qtype_float = hcl.Fixed(24,12)
-else: # for interface synthesis
-    qtype_float = hcl.Fixed(32,12)
+    target = None
+else: # vhls
+    batch_size = 1
+    qtype_float = hcl.Fixed(32,12) # for interface synthesis
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="csyn")
 # qtype_packed = hcl.UInt(32)
 
 def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
@@ -117,7 +120,7 @@ class ResNet():
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for i, stride in enumerate(strides):
-            layers.append(block(self.in_planes, planes, stride, params[i*18:(i+1)*18], name="bb{}".format(id*3+i)))
+            layers.append(block(self.in_planes, planes, stride, params[i*18:(i+1)*18], name="layer{}_{}".format(id+1,i)))
             self.in_planes = planes
 
         return Sequential(*layers)
@@ -126,8 +129,8 @@ class ResNet():
         return self.forward(x)
 
     def forward(self, x):
-        conv1 = nn.conv2d_nchw(x, self.params["conv1"], strides=[1, 1], padding=[1, 1], name="out_conv", out_dtype=qtype_float)
-        bn, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name="out_bn",dtype=qtype_float)
+        conv1 = nn.conv2d_nchw(x, self.params["conv1"], strides=[1, 1], padding=[1, 1], name="conv1", out_dtype=qtype_float)
+        bn, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name="bn1",dtype=qtype_float)
         layer1 = self.layer1(bn)
         layer2 = self.layer2(layer1)
         layer3 = self.layer3(layer2)
@@ -142,6 +145,42 @@ def build_resnet20(*params): # params are placeholders here
     return resnet(params[0])
 
 def build_resnet20_inf(params, target=target):
+
+    if isinstance(target,hcl.platform):
+        s.to([input_image] + hcl_ph, target.xcel)
+        s.to(build_resnet20.fc, target.host)
+
+    return hcl.build(s, target=target)
+
+def build_resnet20_opt_inf(params, target=target):
+
+    for layer in build_resnet20.__dict__.keys():
+        s_layer = getattr(build_resnet20,layer)
+        if "pad" in layer:
+            s[s_layer].pipeline(s_layer.axis[2])
+            s.partition(s_layer,dim=4)
+        elif "bn" in layer or "rsign" in layer or "residual" in layer or "rprelu" in layer:
+            s[s_layer].pipeline(s_layer.axis[3])
+        elif "conv" in layer and "pad" not in layer:
+            if "layer2_0" in layer or "layer3_0" in layer:
+                continue # stride=2
+            s[s_layer].pipeline(s_layer.axis[3])
+            s_pad = getattr(build_resnet20,layer+"_pad")
+            LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
+            WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
+            s.partition(LB,dim=3)
+            s.partition(WB)
+            s.partition(ph_dict[layer+"_weight"],dim=1)
+            s.partition(s_layer,dim=2)
+        elif "avgpool" in layer:
+            s[s_layer].pipeline(s_layer.axis[2])
+            s.partition(s_layer,dim=4)
+        elif "flatten" in layer:
+            s[s_layer].pipeline(s_layer.axis[1])
+        elif "fc_matmul" in layer:
+            s[s_layer].pipeline(s_layer.axis[2])
+            s_fc = getattr(build_resnet20,"fc")
+            s[s_fc].pipeline(s_fc.axis[1])
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
@@ -191,10 +230,12 @@ for name in params:
 hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
 
 hcl_ph = []
+ph_dict = {}
 input_image = hcl.placeholder((batch_size,3,32,32),"input_image",dtype=qtype_float)
 for name in params:
     dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
     hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
+    ph_dict[name] = hcl_ph[-1]
 
 s = hcl.create_schedule([input_image] + hcl_ph, build_resnet20)
 
