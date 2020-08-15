@@ -11,7 +11,10 @@ test_size = 100
 batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(6) # not unsigned!
-qtype_float = hcl.Fixed(20,10)
+if __name__ == "__main__":
+    qtype_float = hcl.Fixed(20,10)
+else:
+    qtype_float = hcl.Fixed(32,10) # for interface synthesis
 qtype_packed = hcl.UInt(32)
 
 # compute declaration
@@ -99,10 +102,10 @@ def build_bnn_inf(batch_size=batch_size,target=target):
     scheme = hcl.create_scheme([input_image] + hcl_ph, build_bnn)
     s = hcl.create_schedule_from_scheme(scheme)
 
-    if isinstance(target,hcl.platform):
-        s.to([input_image] + hcl_ph, target.xcel)
-        s.to(build_bnn.fc2, target.host)
-        target.config(compile="vivado_hls", mode="csyn")
+    # if isinstance(target,hcl.platform):
+    #     s.to([input_image] + hcl_ph, target.xcel)
+    #     s.to(build_bnn.fc2, target.host)
+        # target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 
@@ -178,7 +181,7 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
         s.to(build_packed_bnn.fc2, target.host)
-        target.config(compile="vivado_hls", mode="csyn")
+        # target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 
@@ -214,8 +217,8 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_conv = build_packed_bnn.conv1
             s[s_conv].pipeline(s_conv.axis[3])
             s[s_layer].pipeline(s_layer.axis[3])
-            LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_conv],s_conv.axis[2], "LB")
-            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
+            LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_conv],s_conv.axis[2], "LB1")
+            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB1")
             s.partition(LB, dim=3)
             s.partition(WB)
             s.partition(ph_dict["w_conv1"])
@@ -229,8 +232,8 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_conv = build_packed_bnn.conv2
             s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
             s[s_conv].pipeline(s_conv.axis[3])
-            LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB")
-            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB")
+            LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_conv],s_conv.axis[2], "LB2")
+            WB = s.reuse_at(LB,s[s_conv],s_conv.axis[3], "WB2")
             s.partition(LB, dim=3)
             s.partition(WB)
             s.partition(ph_dict["w_conv2"])
@@ -253,27 +256,9 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
 
-    target = "vhls"
-    f = hcl.build(s, target=target)#, profiler=profiler)
-    def add_loop_label(f):
-        cnt = 1
-        res_f = ""
-        for line in f.split("\n"):
-            if line[:5] == "  for":
-                res_f += "LOOP{}: ".format(cnt) + line.strip() + "\n"
-                cnt += 1
-            else:
-                res_f += line + "\n"
-        return res_f
-    f = add_loop_label(f)
-    with open("vhls_code.cpp","w") as outfile:
-        outfile.write(f)
-    sys.exit()
-
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
         s.to(build_packed_bnn.fc2, target.host)
-        target.config(compile="vivado_hls", mode="csyn")
 
     return hcl.build(s, target=target)
 

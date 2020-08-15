@@ -2,9 +2,10 @@
 #include <ap_fixed.h>
 #include <ap_axi_sdata.h>
 #include <hls_stream.h>
+#include <hls_math.h>
 #include <math.h>
 #include <stdint.h>
-void test(ap_uint<1> input_image[1][1][16][16], ap_uint<1> w_conv1[16][1][3][3], ap_fixed<20, 10> bn_t1[16][16][16], ap_uint<16> w_conv2[32][1][3][3], ap_fixed<20, 10> bn_t2[32][8][8], ap_uint<32> w_fc1[256][16], ap_fixed<20, 10> b_fc1[256], ap_uint<32> w_fc2[10][8], ap_fixed<20, 10> b_fc2[10], ap_fixed<20, 10> fc2[1][10]) {
+void default_function(ap_uint<1> input_image[1][1][16][16], ap_uint<1> w_conv1[16][1][3][3], ap_fixed<20, 10> bn_t1[16][16][16], ap_uint<16> w_conv2[32][1][3][3], ap_fixed<20, 10> bn_t2[32][8][8], ap_uint<32> w_fc1[256][16], ap_fixed<20, 10> b_fc1[256], ap_uint<32> w_fc2[10][8], ap_fixed<20, 10> b_fc2[10], ap_fixed<20, 10> fc2[1][10]) {
   #pragma HLS array_partition variable=bn_t2 complete dim=1
   #pragma HLS array_partition variable=w_conv2 complete dim=0
   #pragma HLS array_partition variable=bn_t1 complete dim=1
@@ -13,6 +14,7 @@ void test(ap_uint<1> input_image[1][1][16][16], ap_uint<1> w_conv1[16][1][3][3],
   ap_int<32> _top;
   ap_uint<1> conv1_pad[1][1][18][18];
   #pragma HLS array_partition variable=conv1_pad complete dim=4
+  ap_int<32> conv1_pad_partitioned;
 LOOP1: for (ap_int<32> index_tuple = 0; index_tuple < 18; ++index_tuple) {
   #pragma HLS pipeline
     for (ap_int<32> i = 0; i < 18; ++i) {
@@ -25,6 +27,7 @@ LOOP1: for (ap_int<32> index_tuple = 0; index_tuple < 18; ++index_tuple) {
   #pragma HLS array_partition variable=LB complete dim=3
   ap_uint<1> WB[1][1][3][3];
   #pragma HLS array_partition variable=WB complete dim=0
+  ap_int<32> conv1_partitioned;
 LOOP2: for (ap_int<32> ff = 0; ff < 16; ++ff) {
     for (ap_int<32> yy_reuse = 0; yy_reuse < 18; ++yy_reuse) {
       for (ap_int<32> xx_reuse = 0; xx_reuse < 18; ++xx_reuse) {
@@ -56,6 +59,7 @@ LOOP2: for (ap_int<32> ff = 0; ff < 16; ++ff) {
   }
   ap_uint<16> bn1[1][1][16][16];
   #pragma HLS array_partition variable=bn1 complete dim=4
+  ap_int<32> bn1_partitioned;
 LOOP3: for (ap_int<32> h = 0; h < 16; ++h) {
     for (ap_int<32> w = 0; w < 16; ++w) {
     #pragma HLS pipeline
@@ -69,6 +73,7 @@ LOOP3: for (ap_int<32> h = 0; h < 16; ++h) {
   }
   ap_uint<16> maxpool1[1][1][8][8];
   #pragma HLS array_partition variable=maxpool1 complete dim=4
+  ap_int<32> maxpool1_partitioned;
 LOOP4: for (ap_int<32> i2 = 0; i2 < 1; ++i2) {
     for (ap_int<32> h1 = 0; h1 < 8; ++h1) {
     #pragma HLS pipeline
@@ -79,6 +84,7 @@ LOOP4: for (ap_int<32> i2 = 0; i2 < 1; ++i2) {
   }
   ap_uint<16> conv2_pad[1][1][10][10];
   #pragma HLS array_partition variable=conv2_pad complete dim=4
+  ap_int<32> conv2_pad_partitioned;
 LOOP5: for (ap_int<32> index_tuple1 = 0; index_tuple1 < 10; ++index_tuple1) {
   #pragma HLS pipeline
     for (ap_int<32> i3 = 0; i3 < 10; ++i3) {
@@ -91,6 +97,7 @@ LOOP5: for (ap_int<32> index_tuple1 = 0; index_tuple1 < 10; ++index_tuple1) {
   #pragma HLS array_partition variable=LB1 complete dim=3
   ap_uint<16> WB1[1][1][3][3];
   #pragma HLS array_partition variable=WB1 complete dim=0
+  ap_int<32> conv2_partitioned;
 LOOP6: for (ap_int<32> ff1 = 0; ff1 < 32; ++ff1) {
     for (ap_int<32> yy_reuse1 = 0; yy_reuse1 < 10; ++yy_reuse1) {
       for (ap_int<32> xx_reuse1 = 0; xx_reuse1 < 10; ++xx_reuse1) {
@@ -124,6 +131,7 @@ LOOP6: for (ap_int<32> ff1 = 0; ff1 < 32; ++ff1) {
   }
   ap_uint<32> bn2[1][1][8][8];
   #pragma HLS array_partition variable=bn2 complete dim=4
+  ap_int<32> bn2_partitioned;
 LOOP7: for (ap_int<32> h2 = 0; h2 < 8; ++h2) {
     for (ap_int<32> w2 = 0; w2 < 8; ++w2) {
     #pragma HLS pipeline
@@ -137,6 +145,7 @@ LOOP7: for (ap_int<32> h2 = 0; h2 < 8; ++h2) {
   }
   ap_uint<32> maxpool2[1][1][4][4];
   #pragma HLS array_partition variable=maxpool2 complete dim=4
+  ap_int<32> maxpool2_partitioned;
 LOOP8: for (ap_int<32> i5 = 0; i5 < 1; ++i5) {
     for (ap_int<32> h3 = 0; h3 < 4; ++h3) {
     #pragma HLS pipeline
