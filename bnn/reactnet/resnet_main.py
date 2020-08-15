@@ -141,17 +141,7 @@ def build_resnet20(*params): # params are placeholders here
     resnet = ResNet(BasicBlock, [3, 3, 3], params[1:])
     return resnet(params[0])
 
-# declare hcl placeholders
-def build_resnet20_inf(params, batch_size=batch_size, target=target):
-    hcl_ph = []
-    input_image = hcl.placeholder((batch_size,3,32,32),"input_image",dtype=qtype_float)
-    for name in params:
-        dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
-        hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
-
-    # build the network
-    scheme = hcl.create_scheme([input_image] + hcl_ph, build_resnet20)
-    s = hcl.create_schedule_from_scheme(scheme)
+def build_resnet20_inf(params, target=target):
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
@@ -199,6 +189,14 @@ for name in params:
     dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
     hcl_array.append(hcl.asarray(params[name],dtype=dtype))
 hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
+
+hcl_ph = []
+input_image = hcl.placeholder((batch_size,3,32,32),"input_image",dtype=qtype_float)
+for name in params:
+    dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
+    hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
+
+s = hcl.create_schedule([input_image] + hcl_ph, build_resnet20)
 
 if __name__ == "__main__":
     resnet20 = build_resnet20_inf(params)
