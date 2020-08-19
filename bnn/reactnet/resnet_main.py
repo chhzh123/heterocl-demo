@@ -154,7 +154,8 @@ def build_resnet20_inf(params, target=target):
 
 def build_resnet20_opt_inf(params, target=target):
 
-    for layer in build_resnet20.__dict__.keys():
+    layer_names = build_resnet20.__dict__.keys()
+    for layer in layer_names:
         s_layer = getattr(build_resnet20,layer)
         if "pad" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
@@ -181,6 +182,14 @@ def build_resnet20_opt_inf(params, target=target):
             s[s_layer].pipeline(s_layer.axis[2])
             s_fc = getattr(build_resnet20,"fc")
             s[s_fc].pipeline(s_fc.axis[1])
+
+    # streaming across layers
+    for i,layer in enumerate(layer_names):
+        if i == len(layer_names) - 1:
+            break
+        layer1 = getattr(build_resnet20,layer)
+        layer2 = getattr(build_resnet20,list(layer_names)[i+1])
+        s.to(layer1,s[layer2])
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
