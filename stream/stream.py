@@ -141,7 +141,7 @@ def test_consecutive():
         return D
 
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls", mode="csim")
+    target.config(compile="vivado_hls", mode="csyn")
     s = hcl.create_schedule([A], kernel)
     s.to([A], target.xcel)
     s.to(kernel.D, target.host)
@@ -181,9 +181,33 @@ def test_residual2():
     hcl_C = hcl.asarray(np_C)
     f(hcl_A, hcl_C)
 
+def test_complex():
+    A = hcl.placeholder((10,), "A")
+
+    def kernel(A):
+        B = hcl.compute(A.shape, 
+                lambda i: A[i] + 1, "B")
+        C = hcl.compute(B.shape,
+                lambda i: hcl.select(i < 9, B[i] + B[i+1], B[i]),"C")
+        return C
+
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="csyn")
+    s = hcl.create_schedule([A], kernel)
+    s.to([A], target.xcel)
+    s.to(kernel.C, target.host)
+    s.to(kernel.B, s[kernel.C])
+    f = hcl.build(s, target)
+    np_A = np.zeros((10,))
+    np_C = np.zeros((10,))
+    hcl_A = hcl.asarray(np_A)
+    hcl_C = hcl.asarray(np_C)
+    f(hcl_A, hcl_C)
+
 if __name__ == "__main__":
     # test_inter_stage()
     # test_simple_reuse()
     # test_residual()
-    test_consecutive()
+    # test_consecutive()
     # test_residual2()
+    test_complex()
