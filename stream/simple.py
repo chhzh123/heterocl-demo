@@ -104,7 +104,49 @@ def double_conv():
     hcl_B = hcl.asarray(np_B)
     f(hcl_A, hcl_w1, hcl_w2, hcl_B)
 
+def simple_add2():
+    if os.system("which vivado_hls >> /dev/null") != 0:
+        return 
+
+    dtype = hcl.Fixed(16,12)
+    # dtype = hcl.Float()
+
+    def test_hls(target_mode):
+        A = hcl.placeholder((10, 32), "A", dtype=dtype)
+        def kernel(A):
+            B = hcl.compute(A.shape, lambda *args : A[args] + 1, "B", dtype=dtype)
+            C = hcl.compute(B.shape, lambda *args : B[args] + 1, "C", dtype=dtype)
+            return C
+        
+        target = hcl.platform.zc706
+        s = hcl.create_schedule([A], kernel)
+        s.to(A, target.xcel)
+        s.to(kernel.C, target.host)
+        s.to(kernel.B, s[kernel.C])
+        target.config(compile="vivado_hls", mode=target_mode)
+        # sys.exit()
+        f = hcl.build(s, target)
+
+        np_A = np.random.randint(10, size=(10,32))
+        np_B = np.zeros((10,32))
+
+        hcl_A = hcl.asarray(np_A, dtype=dtype)
+        hcl_B = hcl.asarray(np_B, dtype=dtype)
+        f(hcl_A, hcl_B)
+        ret_B = hcl_B.asnumpy()
+
+        if "csyn" in target_mode:
+            report = f.report("csyn")
+            assert "ReportVersion" in report
+        elif "csim" in target_mode:
+            for i in range(0, 10):
+                for j in range(0, 32):
+                    assert ret_B[i, j] == (np_A[i, j] + 3)
+
+    test_hls("csim")
+
 if __name__ == '__main__':
     # simple_add()
     # one_conv()
-    double_conv()
+    # double_conv()
+    simple_add2()
