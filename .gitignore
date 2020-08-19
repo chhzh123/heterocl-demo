@@ -7,5 +7,10 @@
 results
 out.prj
 project
+s*-*
 notes
 .vscode
+*.json
+__pycache__
+cifar-10-batches-py
+cifar-10-python.tar.gz
