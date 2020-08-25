@@ -1,4 +1,5 @@
 *_prj
+*.prj
 *.log
 *.txt
 
@@ -14,3 +15,5 @@ notes
 __pycache__
 cifar-10-batches-py
 cifar-10-python.tar.gz
+
+bnn-model-scaling
