@@ -11,10 +11,7 @@ test_size = 100
 batch_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(6) # not unsigned!
-if __name__ == "__main__":
-    qtype_float = hcl.Fixed(20,10)
-else:
-    qtype_float = hcl.Fixed(32,10) # for interface synthesis
+qtype_float = hcl.Fixed(20,10)
 qtype_packed = hcl.UInt(32)
 
 # compute declaration
@@ -128,7 +125,8 @@ def build_bnn_inf_opt(batch_size=batch_size,target=target):
         plt.savefig("bnn.png")
 
     # compute optimization
-    for layer in build_bnn.__dict__.keys():
+    layer_names = build_bnn.__dict__.keys()
+    for layer in layer_names:
         s_layer = getattr(build_bnn,layer)
         if "bn" in layer: # fuse conv
             s_conv = getattr(build_bnn,"conv" + layer[-1])
@@ -203,8 +201,8 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     s = hcl.create_schedule_from_scheme(scheme)
 
     # compute optimization
-    print(build_packed_bnn.__dict__.keys())
-    for layer in build_packed_bnn.__dict__.keys():
+    layer_names = build_packed_bnn.__dict__.keys()
+    for layer in layer_names:
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
             s[s_layer].pipeline(s_layer.axis[2])
@@ -255,6 +253,16 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_layer].pipeline(s_layer.axis[2])
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
+
+    # streaming across layers
+    for i,layer in enumerate(layer_names):
+        if i == len(layer_names) - 1:
+            break
+        if "bn" in layer or "maxpool2" in layer:
+            continue
+        layer1 = getattr(build_packed_bnn,layer)
+        layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
+        s.to(layer1,s[layer2])
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
