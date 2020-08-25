@@ -7,6 +7,11 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--vitis', type=bool, default=False,
+                    help='Use Vitis to compile? (default: False)')
+args = parser.parse_args()
+
 test_size = 100
 qtype_bit = hcl.UInt(1) # weights
 qtype_int = hcl.Int(8)
@@ -18,7 +23,11 @@ else: # vhls
     batch_size = 1
     qtype_float = hcl.Fixed(32,12) # for interface synthesis
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls", mode="csyn")
+    if args.vitis:
+        print("Use Vitis to compile")
+        target.config(compile="vitis", mode="hw_exe")
+    else:
+        target.config(compile="vivado_hls", mode="csyn")
 # qtype_packed = hcl.UInt(32)
 
 def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
@@ -159,7 +168,7 @@ def build_resnet20_opt_inf(params, target=target):
         s_layer = getattr(build_resnet20,layer)
         if "pad" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=4)
+            # s.partition(s_layer,dim=4) # avoid using with streaming
         elif "bn" in layer or "rsign" in layer or "residual" in layer or "rprelu" in layer:
             s[s_layer].pipeline(s_layer.axis[3])
         elif "conv" in layer and "pad" not in layer:
@@ -172,10 +181,10 @@ def build_resnet20_opt_inf(params, target=target):
             s.partition(LB,dim=3)
             s.partition(WB)
             s.partition(ph_dict[layer+"_weight"],dim=1)
-            s.partition(s_layer,dim=2)
+            # s.partition(s_layer,dim=2) # avoid using with streaming
         elif "avgpool" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=4)
+            # s.partition(s_layer,dim=4) # avoid using with streaming
         elif "flatten" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif "fc_matmul" in layer:
@@ -187,6 +196,8 @@ def build_resnet20_opt_inf(params, target=target):
     for i,layer in enumerate(layer_names):
         if i == len(layer_names) - 1:
             break
+        if "bn" in layer or "pool" in layer:
+            continue
         layer1 = getattr(build_resnet20,layer)
         layer2 = getattr(build_resnet20,list(layer_names)[i+1])
         s.to(layer1,s[layer2])
