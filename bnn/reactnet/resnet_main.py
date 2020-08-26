@@ -8,8 +8,12 @@ import torchvision
 import torchvision.transforms as transforms
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--pytorch', type=bool, default=False,
+                    help="Use PyTorch's dataloader? (default: True)")
 parser.add_argument('--vitis', type=bool, default=False,
                     help='Use Vitis to compile? (default: False)')
+parser.add_argument('--opt', type=bool, default=False,
+                    help='Use optimization? (default: False)')
 args = parser.parse_args()
 
 test_size = 100
@@ -209,17 +213,26 @@ def build_resnet20_opt_inf(params, target=target):
     return hcl.build(s, target=target)
 
 def load_cifar10():
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=mean,std=std)
     transform_test = transforms.Compose([
                     transforms.ToTensor(),
                     normalize
         ])
     test_set = torchvision.datasets.CIFAR10(root='.', train=False,
                                            download=True, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
-                                             shuffle=False,
-                                             num_workers=2)
+    if not args.pytorch:
+        test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
+                                                shuffle=False,
+                                                num_workers=2)
+    else:
+        print("NOT using Pytorch's dataloader")
+        images = ((test_set.data * 1.0 / 255 - mean) / std).transpose((0,3,1,2))
+        labels = np.array(test_set.targets)
+        images = np.split(images, images.shape[0] // batch_size)
+        labels = np.split(labels, labels.shape[0] // batch_size)
+        test_loader = zip(images, labels)
     classes = ('plane', 'car', 'bird', 'cat',
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     return test_loader
@@ -265,9 +278,9 @@ if __name__ == "__main__":
 
     correct_sum = 0
     for i, (images, labels) in enumerate(test_loader):
-        np_image = images.numpy()
-        labels = labels.numpy()
-        hcl_image = hcl.asarray(np_image, dtype=qtype_float)
+        images = np.array(images)
+        labels = np.array(labels)
+        hcl_image = hcl.asarray(images, dtype=qtype_float)
         resnet20(hcl_image, *hcl_array, hcl_out)
         prediction = np.argmax(hcl_out.asnumpy(), axis=1)
         correct_sum += np.sum(np.equal(prediction, labels))
