@@ -1,16 +1,18 @@
 import heterocl as hcl
 import numpy as np
 
+SIZE = 6
+KERNEL_SIZE = 3
 hcl.init()
 
 def conv1():
-    A = hcl.placeholder((6, 6), "A")
+    A = hcl.placeholder((SIZE, SIZE), "A")
 
     def kernel(A):
-        r = hcl.reduce_axis(0, 3)
-        c = hcl.reduce_axis(0, 3)
-        F = hcl.copy(np.random.randint(0,10,(3,3)),"F")
-        return hcl.compute((4, 4),
+        r = hcl.reduce_axis(0, KERNEL_SIZE)
+        c = hcl.reduce_axis(0, KERNEL_SIZE)
+        F = hcl.copy(np.random.randint(0,10,(KERNEL_SIZE,KERNEL_SIZE)),"F")
+        return hcl.compute((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1),
                 lambda y, x: hcl.sum(A[y+r, x+c] * F[r, c], axis=[r, c]), "B")
 
     s = hcl.create_schedule([A], kernel)
@@ -25,17 +27,17 @@ def conv1():
     target.config(compile="vivado_hls",mode="csyn",project="conv1")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
-    hcl_B = hcl.asarray(np.zeros((4, 4)))
+    hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
     f(hcl_A, hcl_B)
 
 def conv2():
-    A = hcl.placeholder((6, 6), "A")
-    F = hcl.placeholder((3, 3), "F")
+    A = hcl.placeholder((SIZE, SIZE), "A")
+    F = hcl.placeholder((KERNEL_SIZE, KERNEL_SIZE), "F")
 
     def kernel(A, F):
-        r = hcl.reduce_axis(0, 3)
-        c = hcl.reduce_axis(0, 3)
-        return hcl.compute((4, 4),
+        r = hcl.reduce_axis(0, KERNEL_SIZE)
+        c = hcl.reduce_axis(0, KERNEL_SIZE)
+        return hcl.compute((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1),
                 lambda y, x: hcl.sum(A[y+r, x+c] * F[r, c], axis=[r, c]), "B")
 
     s = hcl.create_schedule([A, F], kernel)
@@ -51,17 +53,17 @@ def conv2():
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape))
-    hcl_B = hcl.asarray(np.zeros((4, 4)))
+    hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
     f(hcl_A, hcl_F, hcl_B)
 
 def conv3():
-    A = hcl.placeholder((6, 6), "A")
+    A = hcl.placeholder((SIZE, SIZE), "A")
 
     def kernel(A):
-        r = hcl.reduce_axis(0, 3)
-        c = hcl.reduce_axis(0, 3)
-        F = hcl.const_tensor(np.random.randint(0,10,(3,3)), "F")
-        return hcl.compute((4, 4),
+        r = hcl.reduce_axis(0, KERNEL_SIZE)
+        c = hcl.reduce_axis(0, KERNEL_SIZE)
+        F = hcl.const_tensor(np.random.randint(0,10,(KERNEL_SIZE,KERNEL_SIZE)), "F")
+        return hcl.compute((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1),
                 lambda y, x: hcl.sum(A[y+r, x+c] * F[r, c], axis=[r, c]), "B")
 
     s = hcl.create_schedule([A], kernel)
@@ -76,7 +78,7 @@ def conv3():
     target.config(compile="vivado_hls",mode="csyn",project="conv3")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
-    hcl_B = hcl.asarray(np.zeros((4, 4)))
+    hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
     f(hcl_A, hcl_B)
 
 if __name__ == "__main__":
