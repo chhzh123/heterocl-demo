@@ -181,10 +181,6 @@ def build_resnet20_stream_inf(params, target=target):
             s[s_layer].pipeline(s_layer.axis[2])
             # s.partition(s_layer,dim=4) # avoid using with streaming
         elif "bn" in layer:
-            # s.partition(ph_dict[layer+"_weight"],dim=1)
-            # s.partition(ph_dict[layer+"_bias"],dim=1)
-            # s.partition(ph_dict[layer+"_running_mean"],dim=1)
-            # s.partition(ph_dict[layer+"_running_var"],dim=1)
             s[s_layer].pipeline(s_layer.axis[3])
         elif "rsign" in layer or "residual" in layer or "rprelu" in layer:
             s[s_layer].pipeline(s_layer.axis[3])
@@ -195,8 +191,6 @@ def build_resnet20_stream_inf(params, target=target):
             s_pad = getattr(build_resnet20,layer+"_pad")
             LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
-            # s.partition(LB,dim=3)
-            # s.partition(WB)
             # s.partition(ph_dict[layer+"_weight"])
             # s.partition(s_layer,dim=2) # avoid using with streaming
         elif "avgpool" in layer:
@@ -209,27 +203,27 @@ def build_resnet20_stream_inf(params, target=target):
             s_fc = getattr(build_resnet20,"fc")
             s[s_fc].pipeline(s_fc.axis[1])
 
-    # streaming across layers
-    for i,layer in enumerate(layer_names):
-        if i == len(layer_names) - 1:
+    # streaming across layers (straight line)
+    straight_layer_names = layer_names.copy()
+    straight_layer_names.remove("layer2_0_avgpool")
+    straight_layer_names.remove("layer2_0_concat")
+    straight_layer_names.remove("layer3_0_avgpool")
+    straight_layer_names.remove("layer3_0_concat")
+    for i,layer in enumerate(straight_layer_names):
+        if i == len(straight_layer_names) - 1:
             break
-        if "bn" in layer or "_avgpool" in layer or "concat" in layer: # avoid bn->pool
-            continue
         layer1 = getattr(build_resnet20,layer)
-        layer2 = getattr(build_resnet20,list(layer_names)[i+1])
+        layer2 = getattr(build_resnet20,list(straight_layer_names)[i+1])
         s.to(layer1,s[layer2])
     # residual streaming
     f = build_resnet20
     for layer in range(1,4):
         for bb in range(3):
-            if layer == 1:
-                prev = "bn1" if bb == 0 else "layer{}_{}_rprelu2".format(layer,bb-1)
+            if bb == 0:
+                prev = "bn1" if layer == 1 else "layer{}_2_rprelu2".format(layer-1)
             else:
-                prev = "layer{}_2_rprelu2".format(layer-1) if bb == 0 \
-                        else "layer{}_{}_rprelu2".format(layer,bb-1)
+                prev = "layer{}_{}_rprelu2".format(layer,bb-1)
             if not (layer != 1 and bb == 0):
-                s.to(getattr(f,prev),
-                     getattr(f,"layer{}_{}_rsign1".format(layer,bb)))
                 s.to(getattr(f,prev),
                      getattr(f,"layer{}_{}_residual1".format(layer,bb)))
             else: # 2_0 3_0
@@ -239,88 +233,7 @@ def build_resnet20_stream_inf(params, target=target):
                      getattr(f,"layer{}_{}_concat".format(layer,bb)))
                 s.to(getattr(f,"layer{}_{}_concat".format(layer,bb)),
                      getattr(f,"layer{}_{}_residual1".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_bn1".format(layer,bb)),
-                 getattr(f,"layer{}_{}_residual1".format(layer,bb)))
             s.to(getattr(f,"layer{}_{}_rprelu1".format(layer,bb)),
-                 getattr(f,"layer{}_{}_rsign2".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_rprelu1".format(layer,bb)),
-                 getattr(f,"layer{}_{}_residual2".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_bn2".format(layer,bb)),
-                 getattr(f,"layer{}_{}_residual2".format(layer,bb)))
-
-    if isinstance(target,hcl.platform):
-        s.to([input_image] + hcl_ph, target.xcel)
-        s.to(build_resnet20.fc, target.host)
-
-    return hcl.build(s, target=target)
-
-def build_resnet20_opt_inf(params, target=target):
-
-    layer_names = build_resnet20.__dict__.keys()
-    for layer in layer_names:
-        s_layer = getattr(build_resnet20,layer)
-        if "pad" in layer:
-            s[s_layer].pipeline(s_layer.axis[2])
-            # s.partition(s_layer,dim=4) # avoid using with streaming
-        elif "bn" in layer:
-            s.partition(ph_dict[layer+"_weight"],dim=1)
-            s.partition(ph_dict[layer+"_bias"],dim=1)
-            s.partition(ph_dict[layer+"_running_mean"],dim=1)
-            s.partition(ph_dict[layer+"_running_var"],dim=1)
-            s[s_layer].pipeline(s_layer.axis[3])
-        elif "rsign" in layer or "residual" in layer or "rprelu" in layer:
-            s[s_layer].pipeline(s_layer.axis[3])
-        elif "conv" in layer and "pad" not in layer:
-            if "layer2_0" in layer or "layer3_0" in layer:
-                continue # stride=2
-            s[s_layer].pipeline(s_layer.axis[3])
-            s_pad = getattr(build_resnet20,layer+"_pad")
-            LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
-            WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
-            s.partition(LB,dim=3) # automatically done by Vivado HLS
-            s.partition(WB)
-            s.partition(ph_dict[layer+"_weight"])
-            # s.partition(s_layer,dim=2) # avoid using with streaming
-        elif "avgpool" in layer:
-            s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=4) # avoid using with streaming
-        elif "flatten" in layer:
-            s[s_layer].pipeline(s_layer.axis[1])
-        elif "fc_matmul" in layer:
-            s[s_layer].pipeline(s_layer.axis[2])
-            s_fc = getattr(build_resnet20,"fc")
-            s[s_fc].pipeline(s_fc.axis[1])
-
-    # streaming across layers
-    for i,layer in enumerate(layer_names):
-        if i == len(layer_names) - 1:
-            break
-        if "bn" in layer or "pool" in layer or layer == "layer3_2_rprelu2":
-            continue
-        layer1 = getattr(build_resnet20,layer)
-        layer2 = getattr(build_resnet20,list(layer_names)[i+1])
-        s.to(layer1,s[layer2])
-    # residual streaming
-    f = build_resnet20
-    for layer in range(1,4):
-        for bb in range(3):
-            if layer == 1:
-                prev = "bn1" if bb == 0 else "layer{}_{}_rprelu2".format(layer,bb-1)
-            else:
-                prev = "layer{}_2_rprelu2".format(layer) if bb == 0 \
-                        else "layer{}_{}_rprelu2".format(layer,bb-1)
-            if not (layer != 1 and bb == 0):
-                s.to(getattr(f,prev),
-                     getattr(f,"layer{}_{}_rsign1".format(layer,bb)))
-                s.to(getattr(f,prev),
-                     getattr(f,"layer{}_{}_residual1".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_bn1".format(layer,bb)),
-                 getattr(f,"layer{}_{}_residual1".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_rprelu1".format(layer,bb)),
-                 getattr(f,"layer{}_{}_rsign2".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_rprelu1".format(layer,bb)),
-                 getattr(f,"layer{}_{}_residual2".format(layer,bb)))
-            s.to(getattr(f,"layer{}_{}_bn2".format(layer,bb)),
                  getattr(f,"layer{}_{}_residual2".format(layer,bb)))
 
     if isinstance(target,hcl.platform):
