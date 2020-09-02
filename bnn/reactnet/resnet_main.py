@@ -213,7 +213,7 @@ def build_resnet20_stream_inf(params, target=target):
     for i,layer in enumerate(layer_names):
         if i == len(layer_names) - 1:
             break
-        if "bn" in layer or "pool" in layer or "concat" in layer: # avoid bn->pool
+        if "bn" in layer or "_avgpool" in layer or "concat" in layer: # avoid bn->pool
             continue
         layer1 = getattr(build_resnet20,layer)
         layer2 = getattr(build_resnet20,list(layer_names)[i+1])
