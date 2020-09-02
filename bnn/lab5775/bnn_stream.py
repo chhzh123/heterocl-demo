@@ -41,8 +41,8 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
 
     conv2 = bnn.packed_conv2d_nchw(maxpool1, w_conv2, padding=[1,1], name="conv2", out_dtype=qtype_int) # 32*8*8
     bn2 = bnn.packed_batch_norm_threshold(conv2, bn_t2, name="bn2")
-    maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2",unpack=False) # 16*8*8
-    # maxpool2 = bnn.packed_max_pool2d_LB(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    # maxpool2 = bnn.packed_max_pool2d_nchw(bn2, [2,2], [2,2], name="maxpool2",unpack=False) # 16*8*8
+    maxpool2 = bnn.packed_max_pool2d_LB(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
 
     pack = bnn.packed_flatten(maxpool2,name="packed_flatten")
     fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512/32->256/32
@@ -148,14 +148,9 @@ def build_bitpacked_bnn_inf(batch_size=batch_size,target=target):
     # build the network
     s = hcl.create_schedule([input_image] + hcl_ph, build_packed_bnn)
     layer_names = build_packed_bnn.__dict__.keys()
-    print(layer_names)
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
-        # s.to(build_packed_bnn.maxpool1_S, target.xcel)
-        # s.to(build_packed_bnn.maxpool1_S.maxpool1_LB, target.xcel)
-        # s.to(build_packed_bnn.maxpool2, target.xcel)
-        # s.to(build_packed_bnn.maxpool2_S.maxpool2_LB, target.xcel)
         s.to(build_packed_bnn.fc2, target.host)
 
     return hcl.build(s, target=target)
@@ -178,8 +173,6 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
 
     # compute optimization
     layer_names = build_packed_bnn.__dict__.keys()
-    # print(layer_names)
-    # sys.exit()
     for layer in layer_names:
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
@@ -203,7 +196,6 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s.partition(s_layer,dim=4)
         elif layer == "maxpool1":
             s.partition(s_layer,dim=4)
-        elif layer == "maxpool1_S":
             s[s_layer].pipeline(s_layer.axis[2])
         elif layer == "bn2":
             s_conv = build_packed_bnn.conv2
@@ -219,7 +211,6 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s.partition(s_layer,dim=4)
         elif layer == "maxpool2":
             s.partition(s_layer,dim=4)
-        elif layer == "maxpool2_S":
             s[s_layer].pipeline(s_layer.axis[2])
         elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
@@ -235,14 +226,12 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_fc2].pipeline(s_fc2.axis[1])
 
     # streaming across layers
-    for i,layer in enumerate(layer_names):
-        if i == len(layer_names) - 1:
-            break
-        if "bn" in layer or "maxpool2" in layer:
-            continue
-        layer1 = getattr(build_packed_bnn,layer)
-        layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
-        s.to(layer1,s[layer2])
+    # for i,layer in enumerate(layer_names):
+    #     if i == len(layer_names) - 1:
+    #         break
+    #     layer1 = getattr(build_packed_bnn,layer)
+    #     layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
+    #     s.to(layer1,s[layer2])
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
@@ -262,7 +251,7 @@ if __name__ == '__main__':
     else:
         hcl_array = []
         for name in packed_params:
-            if "w_conv2" in name and PACK_CONV:
+            if "w_conv2" in name:
                 dtype = hcl.UInt(16)
             else:
                 dtype = qtype_bit if "conv" in name else (qtype_packed if "w_fc" in name else qtype_float)
