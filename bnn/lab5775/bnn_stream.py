@@ -226,12 +226,15 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_fc2].pipeline(s_fc2.axis[1])
 
     # streaming across layers
-    # for i,layer in enumerate(layer_names):
-    #     if i == len(layer_names) - 1:
-    #         break
-    #     layer1 = getattr(build_packed_bnn,layer)
-    #     layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
-    #     s.to(layer1,s[layer2])
+    layer_names = list(layer_names)
+    layer_names.remove("maxpool1_LB")
+    layer_names.remove("maxpool2_LB")
+    for i,layer in enumerate(layer_names):
+        if i == len(layer_names) - 1:
+            break
+        layer1 = getattr(build_packed_bnn,layer)
+        layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
+        s.to(layer1,s[layer2])
 
     if isinstance(target,hcl.platform):
         s.to([input_image] + hcl_ph, target.xcel)
