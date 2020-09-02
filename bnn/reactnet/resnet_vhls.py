@@ -7,8 +7,10 @@ from resnet_main import *
 if not args.opt:
     resnet20 = build_resnet20_inf(params)
 else:
-    print("Use optimization.")
-    resnet20 = build_resnet20_opt_inf(params)
+    # print("Use optimization.")
+    # resnet20 = build_resnet20_opt_inf(params)
+    print("Use streaming")
+    resnet20 = build_resnet20_stream_inf(params)
 print("Finish building function.")
 
 images, labels = next(iter(test_loader))
