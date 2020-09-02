@@ -191,7 +191,7 @@ def build_resnet20_stream_inf(params, target=target):
             s_pad = getattr(build_resnet20,layer+"_pad")
             LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
-            # s.partition(ph_dict[layer+"_weight"])
+            s.partition(ph_dict[layer+"_weight"])
             # s.partition(s_layer,dim=2) # avoid using with streaming
         elif "avgpool" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
