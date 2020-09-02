@@ -251,6 +251,7 @@ def test_hierarchy():
     target = hcl.platform.zc706
     target.config(compile="vivado_hls",mode="csyn")
     s.to(A, target.xcel)
+    # s.to(kernel.out, target.xcel)
     s.to(kernel.C, target.host)
     f = hcl.build(s, target=target)
     np_A = np.random.randint(0, 10, A.shape)
@@ -299,6 +300,35 @@ def test_imperative():
     hcl_B = hcl.asarray(np.zeros((2, 2),np.float),dtype)
     f(hcl_A, hcl_B)
 
+from collections import OrderedDict
+import heterocl.tvm as tvm
+
+def test_dataflow():
+    A = hcl.placeholder((1,10), "A")
+
+    def kernel(A):
+        B = hcl.compute(A.shape, 
+                lambda i, j: A[i, j] + 1, "B", attrs=OrderedDict([('app',tvm.make.StringImm('B'))]))
+        C = hcl.compute(B.shape,
+                lambda i, j: B[i, j] + 1, "C", attrs=OrderedDict([('app',tvm.make.StringImm('C'))]))
+        D = hcl.compute(C.shape,
+                lambda i, j: C[i, j] + 1, "D", attrs=OrderedDict([('app',tvm.make.StringImm('D'))]))
+        return D
+
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="csyn")
+    s = hcl.create_schedule([A], kernel)
+    s.to([A], target.xcel)
+    s.to(kernel.D, target.host)
+    s.to(kernel.B, s[kernel.C])
+    s.to(kernel.C, s[kernel.D])
+    f = hcl.build(s, target)
+    np_A = np.zeros((1,10))
+    np_D = np.zeros((1,10))
+    hcl_A = hcl.asarray(np_A)
+    hcl_D = hcl.asarray(np_D)
+    f(hcl_A, hcl_D)
+
 if __name__ == "__main__":
     # test_inter_stage()
     # test_simple_reuse()
@@ -308,4 +338,5 @@ if __name__ == "__main__":
     # test_residual2()
     # test_complex()
     # test_imperative()
-    test_hierarchy()
+    # test_hierarchy()
+    test_dataflow()
