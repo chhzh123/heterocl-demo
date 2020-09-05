@@ -9,7 +9,7 @@ import torchvision.transforms as transforms
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--pytorch', type=bool, default=False,
-                    help="Use PyTorch's dataloader? (default: False)")
+                    help="Use PyTorch's dataloader? (default: True)")
 parser.add_argument('--vitis', type=bool, default=False,
                     help='Use Vitis to compile? (default: False)')
 parser.add_argument('--opt', type=bool, default=False,
@@ -57,14 +57,14 @@ class BasicBlock():
 
     def __init__(self, in_planes, planes, stride, params, name="bb"):
         self.params = dict()
-        self.params["rprelu1"] = params[:3]
-        self.params["rprelu2"] = params[3:6]
-        self.params["rsign1"] = params[6]
-        self.params["rsign2"] = params[7]
-        self.params["conv1"] = params[8]
-        self.params["bn1"] = params[9:13]
-        self.params["conv2"] = params[13]
-        self.params["bn2"] = params[14:18]
+        self.params["rprelu1"] = [hcl.const_tensor(params[i],"w_{}_rprelu1_{}".format(name,i),qtype_float) for i in range(3)]
+        self.params["rprelu2"] = [hcl.const_tensor(params[i],"w_{}_rprelu2_{}".format(name,i),qtype_float) for i in range(3,6)]
+        self.params["rsign1"] = hcl.const_tensor(params[6],"w_{}_rsign1".format(name),qtype_float)
+        self.params["rsign2"] = hcl.const_tensor(params[7],"w_{}_rsign2".format(name),qtype_float)
+        self.params["conv1"] = hcl.const_tensor(params[8],"w_{}_conv1".format(name),qtype_bit)
+        self.params["bn1"] = [hcl.const_tensor(params[i],"w_{}_bn1_{}".format(name,i),qtype_float) for i in range(9,13)]
+        self.params["conv2"] = hcl.const_tensor(params[13],"w_{}_conv2".format(name),qtype_bit)
+        self.params["bn2"] = [hcl.const_tensor(params[i],"w_{}_bn2_{}".format(name,i),qtype_float) for i in range(14,18)]
         self.stride = stride
         self.flag = in_planes != planes
         self.name = name
@@ -124,12 +124,12 @@ class ResNet():
     def __init__(self, block, num_blocks, params):
         self.in_planes = 16
         self.params = dict()
-        self.params["conv1"] = params[0]
-        self.params["bn1"] = params[1:5]
+        self.params["conv1"] = hcl.const_tensor(params[0],"w_conv1",qtype_float)
+        self.params["bn1"] = [hcl.const_tensor(params[i],"w_bn1_{}".format(i),qtype_float) for i in range(1,5)]
         self.params["layer1"] = params[5:59]
         self.params["layer2"] = params[59:113]
         self.params["layer3"] = params[113:167]
-        self.params["linear"] = params[167:]
+        self.params["linear"] = [hcl.const_tensor(params[i],"w_fc_{}".format(i),qtype_float) for i in range(167,169)]
         self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1, params=self.params["layer1"], id=0)
         self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2, params=self.params["layer2"], id=1)
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2, params=self.params["layer3"], id=2)
@@ -159,24 +159,26 @@ class ResNet():
         out = nn.dense(flat, self.params["linear"][0], bias=self.params["linear"][1], name="fc", out_dtype=qtype_float)
         return out
 
-def build_resnet20(*params): # params are placeholders here
-    resnet = ResNet(BasicBlock, [3, 3, 3], params[1:])
-    return resnet(params[0])
+def build_resnet20(input_image): # params are placeholders here
+    resnet = ResNet(BasicBlock, [3, 3, 3], hcl_params)
+    return resnet(input_image)
 
-def build_resnet20_inf(params, target=target):
+def build_resnet20_inf(target=target):
 
     if isinstance(target,hcl.platform):
-        s.to([input_image] + hcl_ph, target.xcel)
+        s.to([input_image], target.xcel)
         s.to(build_resnet20.fc, target.host)
 
     return hcl.build(s, target=target)
 
-def build_resnet20_stream_inf(params, target=target):
+def build_resnet20_stream_inf(target=target):
 
     layer_names = list(build_resnet20.__dict__.keys())
-    layer_names.remove("layer2_0_avgpool_LB")
-    layer_names.remove("layer3_0_avgpool_LB")
-    layer_names.remove("avgpool_LB")
+    new_layer = []
+    for layer in layer_names:
+        if not ("LB" in layer or "w_" in layer):
+            new_layer.append(layer)
+    layer_names = new_layer
     for layer in layer_names:
         s_layer = getattr(build_resnet20,layer)
         if "pad" in layer:
@@ -240,7 +242,7 @@ def build_resnet20_stream_inf(params, target=target):
                     getattr(f,"layer{}_{}_residual2".format(layer,bb)))
 
     if isinstance(target,hcl.platform):
-        s.to([input_image] + hcl_ph, target.xcel)
+        s.to([input_image], target.xcel)
         s.to(build_resnet20.fc, target.host)
 
     return hcl.build(s, target=target)
@@ -274,6 +276,7 @@ params = torch.load("pretrained-models/model_react-resnet20-8bitBN.pt", map_loca
 print("Loading the data.")
 test_loader = load_cifar10()
 new_params = dict()
+hcl_params = []
 for key in params:
     params[key] = params[key].numpy()
     new_key = key.replace(".","_")
@@ -287,26 +290,16 @@ for key in params:
         new_params[new_key] = temp
     else:
         new_params[new_key] = np.array(params[key])
+    hcl_params.append(new_params[new_key])
 params = new_params
 
-hcl_array = []
-for name in params:
-    dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
-    hcl_array.append(hcl.asarray(params[name],dtype=dtype))
+input_image = hcl.placeholder((batch_size,3,32,32),"input_image",dtype=qtype_float)
+s = hcl.create_schedule([input_image], build_resnet20)
+
 hcl_out = hcl.asarray(np.zeros((batch_size,10)).astype(np.float),dtype=qtype_float)
 
-hcl_ph = []
-ph_dict = {}
-input_image = hcl.placeholder((batch_size,3,32,32),"input_image",dtype=qtype_float)
-for name in params:
-    dtype = qtype_bit if "conv" in name and "layer" in name else qtype_float
-    hcl_ph.append(hcl.placeholder(params[name].shape,name,dtype=dtype))
-    ph_dict[name] = hcl_ph[-1]
-
-s = hcl.create_schedule([input_image] + hcl_ph, build_resnet20)
-
 if __name__ == "__main__":
-    resnet20 = build_resnet20_inf(params)
+    resnet20 = build_resnet20_inf()
     print("Finish building function.")
 
     correct_sum = 0
@@ -314,7 +307,7 @@ if __name__ == "__main__":
         images = np.array(images)
         labels = np.array(labels)
         hcl_image = hcl.asarray(images, dtype=qtype_float)
-        resnet20(hcl_image, *hcl_array, hcl_out)
+        resnet20(hcl_image, hcl_out)
         prediction = np.argmax(hcl_out.asnumpy(), axis=1)
         correct_sum += np.sum(np.equal(prediction, labels))
         if (i+1) % 10 == 0:
