@@ -34,13 +34,24 @@ else: # vhls
         target.config(compile="vitis", mode="hw_exe")
     else:
         target.config(compile="vivado_hls", mode="csyn")
-# qtype_packed = hcl.UInt(32)
 
 def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
     assert data.shape[1] == alpha.shape[0]
     return hcl.compute(data.shape, lambda nn, cc, ww, hh: 
                         hcl.select(data[nn,cc,ww,hh] + alpha[cc] > 0, 1, 0),
                         name=name, dtype=dtype)
+
+def packed_RSign(data, alpha, name="rsign"): # useless dtype here
+    assert data.shape[1] == alpha.shape[0]
+    batch, channel, out_height, out_width = data.shape
+    bitwidth = channel if channel <= 32 else 32 # pack channels
+    def genpack(nn, cc, hh, ww):
+        out = hcl.scalar(0, name=name+"_pack", dtype=hcl.UInt(bitwidth))
+        with hcl.for_(0, bitwidth) as k:
+            out[0][(k+1) : k] = hcl.select(data[nn, cc*bitwidth+k, hh, ww] + alpha[cc*bitwidth+k] > 0, 1, 0)
+        return out[0]
+    return hcl.compute((batch, channel//bitwidth, out_height, out_width),
+                        genpack, name=name, dtype=hcl.UInt(bitwidth))
 
 def RPReLU(data, x0, y0, beta, name="rprelu", dtype=None):
     assert data.shape[1] == beta.shape[0] \
@@ -61,9 +72,16 @@ class BasicBlock():
         self.params["rprelu2"] = [hcl.const_tensor(params[i],"w_{}_rprelu2_{}".format(name,i),qtype_float) for i in range(3,6)]
         self.params["rsign1"] = hcl.const_tensor(params[6],"w_{}_rsign1".format(name),qtype_float)
         self.params["rsign2"] = hcl.const_tensor(params[7],"w_{}_rsign2".format(name),qtype_float)
-        self.params["conv1"] = hcl.const_tensor(params[8],"w_{}_conv1".format(name),qtype_bit)
+        if name.split("layer")[1][0] == "1":
+            bitwidth = 16
+        elif name.split("layer")[1][0] == "2":
+            bitwidth = 32
+        else:
+            bitwidth = 32 # do NOT use 64 bitwidth!
+        dtype = hcl.UInt(bitwidth) # remember to set
+        self.params["conv1"] = hcl.const_tensor(params[8],"w_{}_conv1".format(name),hcl.UInt(bitwidth))
         self.params["bn1"] = [hcl.const_tensor(params[i],"w_{}_bn1_{}".format(name,i),qtype_float) for i in range(9,13)]
-        self.params["conv2"] = hcl.const_tensor(params[13],"w_{}_conv2".format(name),qtype_bit)
+        self.params["conv2"] = hcl.const_tensor(params[13],"w_{}_conv2".format(name),hcl.UInt(bitwidth))
         self.params["bn2"] = [hcl.const_tensor(params[i],"w_{}_bn2_{}".format(name,i),qtype_float) for i in range(14,18)]
         self.stride = stride
         self.flag = in_planes != planes
@@ -74,13 +92,12 @@ class BasicBlock():
 
     def forward(self, x):
         # 1st residual block
-        rsign1 = RSign(x, self.params["rsign1"], name=self.name+"_rsign1", dtype=qtype_int)
-        conv1 = bnn.conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
+        # rsign1 = RSign(x, self.params["rsign1"], name=self.name+"_rsign1", dtype=qtype_int)
+        # conv1 = bnn.conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
+        rsign1 = packed_RSign(x, self.params["rsign1"], name=self.name+"_rsign1")
+        conv1 = bnn.packed_conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
         bn1, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name=self.name+"_bn1",dtype=qtype_float)
         if self.stride != 1 or self.flag:
-            # avgpool = nn.avg_pool2d_nchw(x, pooling=[2,2],
-            #                              stride=[2,2], padding=[0,0],
-            #                              name=self.name+"_avgpool",dtype=qtype_float)
             avgpool = nn.avg_pool2d_LB(x, pooling=[2,2],
                                        stride=[2,2], padding=[0,0],
                                        name=self.name+"_avgpool",dtype=qtype_float)
@@ -96,8 +113,10 @@ class BasicBlock():
                                 name=self.name+"_residual1",dtype=qtype_float)
         # 2nd residual block
         rprelu1 = RPReLU(residual1, *self.params["rprelu1"], name=self.name+"_rprelu1",dtype=qtype_float)
-        rsign2 = RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2",dtype=qtype_bit)
-        conv2 = bnn.conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
+        # rsign2 = RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2",dtype=qtype_bit)
+        # conv2 = bnn.conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
+        rsign2 = packed_RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2")
+        conv2 = bnn.packed_conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
         bn2, _, _ = nn.batch_norm(conv2, *self.params["bn2"], name=self.name+"_bn2",dtype=qtype_float)
         residual2 = hcl.compute(rprelu1.shape, lambda nn, cc, ww, hh:
                                 bn2[nn, cc, ww, hh] + rprelu1[nn, cc, ww, hh],
@@ -153,7 +172,6 @@ class ResNet():
         layer2 = self.layer2(layer1)
         layer3 = self.layer3(layer2)
         kernel_size = layer3.shape[3]
-        # avgpool = nn.avg_pool2d_nchw(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
         avgpool = nn.avg_pool2d_LB(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
         flat = nn.flatten(avgpool, name="flatten", dtype=qtype_float)
         out = nn.dense(flat, self.params["linear"][0], bias=self.params["linear"][1], name="fc", out_dtype=qtype_float)
@@ -287,7 +305,19 @@ for key in params:
     elif "conv" in key and "layer" in key:
         temp = np.sign(params[key])
         temp[temp < 0] = 0 # change from {-1,1} to {0,1}
-        new_params[new_key] = temp
+        # bitpacking
+        if temp.shape[1] == 1: # channel
+            np_type = np.bool
+        elif temp.shape[1] == 16:
+            np_type = np.uint16
+        elif temp.shape[1] == 32:
+            np_type = np.uint32
+        elif temp.shape[1] == 64:
+            np_type = np.uint32
+        arr = temp.transpose(0,2,3,1)
+        arr = np.packbits(arr.astype(np.bool),
+                axis=3,bitorder="little").view(np_type)
+        new_params[new_key] = arr.transpose(0,3,1,2)
     else:
         new_params[new_key] = np.array(params[key])
     hcl_params.append(new_params[new_key])
