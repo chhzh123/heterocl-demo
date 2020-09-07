@@ -36,11 +36,11 @@ else: # vhls
         target.config(compile="vivado_hls", mode="csyn")
 # qtype_packed = hcl.UInt(32)
 
-def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
+def RSign(data, alpha, name="rsign"):
     assert data.shape[1] == alpha.shape[0]
     return hcl.compute(data.shape, lambda nn, cc, ww, hh: 
                         hcl.select(data[nn,cc,ww,hh] + alpha[cc] > 0, 1, 0),
-                        name=name, dtype=dtype)
+                        name=name, dtype=hcl.UInt(1))
 
 def RPReLU(data, x0, y0, beta, name="rprelu", dtype=None):
     assert data.shape[1] == beta.shape[0] \
@@ -74,7 +74,7 @@ class BasicBlock():
 
     def forward(self, x):
         # 1st residual block
-        rsign1 = RSign(x, self.params["rsign1"], name=self.name+"_rsign1", dtype=qtype_int)
+        rsign1 = RSign(x, self.params["rsign1"], name=self.name+"_rsign1")
         conv1 = bnn.conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
         bn1, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name=self.name+"_bn1",dtype=qtype_float)
         if self.stride != 1 or self.flag:
@@ -96,7 +96,7 @@ class BasicBlock():
                                 name=self.name+"_residual1",dtype=qtype_float)
         # 2nd residual block
         rprelu1 = RPReLU(residual1, *self.params["rprelu1"], name=self.name+"_rprelu1",dtype=qtype_float)
-        rsign2 = RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2",dtype=qtype_bit)
+        rsign2 = RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2")
         conv2 = bnn.conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
         bn2, _, _ = nn.batch_norm(conv2, *self.params["bn2"], name=self.name+"_bn2",dtype=qtype_float)
         residual2 = hcl.compute(rprelu1.shape, lambda nn, cc, ww, hh:
