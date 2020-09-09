@@ -80,15 +80,15 @@ class BasicBlock():
     def forward(self, x):
         # 1st residual block
         rsign1 = packed_RSign(x, self.params["rsign1"], name=self.name+"_rsign1")
-        conv1 = bnn.packed_conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
+        conv1 = bnn.packed_conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int, mac=False) # no bias!
         bn1, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name=self.name+"_bn1",dtype=qtype_float)
         if self.stride != 1 or self.flag:
-            avgpool = nn.avg_pool2d_nchw(x, pooling=[2,2],
-                                         stride=[2,2], padding=[0,0],
-                                         name=self.name+"_avgpool",dtype=qtype_float)
-            # avgpool = nn.avg_pool2d_LB(x, pooling=[2,2],
-            #                            stride=[2,2], padding=[0,0],
-            #                            name=self.name+"_avgpool",dtype=qtype_float)
+            # avgpool = nn.avg_pool2d_nchw(x, pooling=[2,2],
+            #                              stride=[2,2], padding=[0,0],
+            #                              name=self.name+"_avgpool",dtype=qtype_float)
+            avgpool = nn.avg_pool2d_LB(x, pooling=[2,2],
+                                       stride=[2,2], padding=[0,0],
+                                       name=self.name+"_avgpool",dtype=qtype_float)
             # dont use nn.concatenate!
             shape = avgpool.shape
             shortcut = hcl.compute((shape[0], shape[1]*2, shape[2], shape[3]),
@@ -102,7 +102,7 @@ class BasicBlock():
         # 2nd residual block
         rprelu1 = RPReLU(residual1, *self.params["rprelu1"], name=self.name+"_rprelu1",dtype=qtype_float)
         rsign2 = packed_RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2")
-        conv2 = bnn.packed_conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
+        conv2 = bnn.packed_conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int, mac=False)
         bn2, _, _ = nn.batch_norm(conv2, *self.params["bn2"], name=self.name+"_bn2",dtype=qtype_float)
         residual2 = hcl.compute(rprelu1.shape, lambda nn, cc, ww, hh:
                                 bn2[nn, cc, ww, hh] + rprelu1[nn, cc, ww, hh],
@@ -158,8 +158,8 @@ class ResNet():
         layer2 = self.layer2(layer1)
         layer3 = self.layer3(layer2)
         kernel_size = layer3.shape[3]
-        avgpool = nn.avg_pool2d_nchw(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
-        # avgpool = nn.avg_pool2d_LB(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
+        # avgpool = nn.avg_pool2d_nchw(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
+        avgpool = nn.avg_pool2d_LB(layer3, pooling=[kernel_size, kernel_size], stride=[kernel_size, kernel_size], padding=[0, 0], name="avgpool", dtype=qtype_float)
         flat = nn.flatten(avgpool, name="flatten", dtype=qtype_float)
         out = nn.dense(flat, self.params["linear"][0], bias=self.params["linear"][1], name="fc", out_dtype=qtype_float)
         return out

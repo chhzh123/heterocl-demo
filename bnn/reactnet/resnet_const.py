@@ -92,10 +92,8 @@ class BasicBlock():
 
     def forward(self, x):
         # 1st residual block
-        # rsign1 = RSign(x, self.params["rsign1"], name=self.name+"_rsign1", dtype=qtype_int)
-        # conv1 = bnn.conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
         rsign1 = packed_RSign(x, self.params["rsign1"], name=self.name+"_rsign1")
-        conv1 = bnn.packed_conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int) # no bias!
+        conv1 = bnn.packed_conv2d_nchw(rsign1, self.params["conv1"], padding=[1,1], strides=[self.stride,self.stride], name=self.name+"_conv1", out_dtype=qtype_int, mac=False) # no bias!
         bn1, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name=self.name+"_bn1",dtype=qtype_float)
         if self.stride != 1 or self.flag:
             avgpool = nn.avg_pool2d_LB(x, pooling=[2,2],
@@ -113,10 +111,8 @@ class BasicBlock():
                                 name=self.name+"_residual1",dtype=qtype_float)
         # 2nd residual block
         rprelu1 = RPReLU(residual1, *self.params["rprelu1"], name=self.name+"_rprelu1",dtype=qtype_float)
-        # rsign2 = RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2",dtype=qtype_bit)
-        # conv2 = bnn.conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
         rsign2 = packed_RSign(rprelu1, self.params["rsign2"], name=self.name+"_rsign2")
-        conv2 = bnn.packed_conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int)
+        conv2 = bnn.packed_conv2d_nchw(rsign2, self.params["conv2"], strides=[1,1], padding=[1,1], name=self.name+"_conv2",out_dtype=qtype_int, mac=False)
         bn2, _, _ = nn.batch_norm(conv2, *self.params["bn2"], name=self.name+"_bn2",dtype=qtype_float)
         residual2 = hcl.compute(rprelu1.shape, lambda nn, cc, ww, hh:
                                 bn2[nn, cc, ww, hh] + rprelu1[nn, cc, ww, hh],
@@ -197,15 +193,20 @@ def build_resnet20_stream_inf(target=target):
         if not ("LB" in layer or "w_" in layer):
             new_layer.append(layer)
     layer_names = new_layer
+    if not args.stream and not args.vitis:
+        s.partition(input_image,dim=4)
     for layer in layer_names:
         s_layer = getattr(build_resnet20,layer)
         if "pad" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
-            # s.partition(s_layer,dim=4) # avoid using with streaming
+            if not args.stream:
+                s.partition(s_layer,dim=4) # avoid using with streaming
         elif "bn" in layer:
             s[s_layer].pipeline(s_layer.axis[3])
         elif "rsign" in layer or "residual" in layer or "rprelu" in layer:
             s[s_layer].pipeline(s_layer.axis[3])
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif "conv" in layer and "pad" not in layer:
             if "layer2_0" in layer or "layer3_0" in layer:
                 continue # stride=2
@@ -213,11 +214,8 @@ def build_resnet20_stream_inf(target=target):
             s_pad = getattr(build_resnet20,layer+"_pad")
             LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
-            # s.partition(ph_dict[layer+"_weight"],hcl.Partition.Cyclic,factor=3,dim=4) # avoid too many registers
-            # s.partition(s_layer,dim=2) # avoid using with streaming
         elif "avgpool" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
-            # s.partition(s_layer,dim=4) # avoid using with streaming
         elif "flatten" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif "fc_matmul" in layer:
