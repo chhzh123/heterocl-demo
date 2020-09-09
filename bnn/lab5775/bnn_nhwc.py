@@ -20,11 +20,11 @@ def build_packed_bnn(input_image, w_conv1, bn_t1,
                      w_fc2, b_fc2): # 16*16*1
     conv1 = bnn.packed_conv2d_nhwc(input_image, w_conv1, padding=[1,1], name="conv1", out_dtype=qtype_int)
     bn1 = bnn.packed_batch_norm_threshold_nhwc(conv1, bn_t1, name="bn1")
-    maxpool1 = bnn.packed_max_pool2d_nhwc(bn1, [2,2], [2,2], name="maxpool1")
+    maxpool1 = bnn.packed_max_pool2d_nhwc_LB(bn1, [2,2], [2,2], name="maxpool1")
 
     conv2 = bnn.packed_conv2d_nhwc(maxpool1, w_conv2, padding=[1,1], name="conv2", out_dtype=qtype_int)
     bn2 = bnn.packed_batch_norm_threshold_nhwc(conv2, bn_t2, name="bn2")
-    maxpool2 = bnn.packed_max_pool2d_nhwc(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    maxpool2 = bnn.packed_max_pool2d_nhwc_LB(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
 
     pack = bnn.packed_flatten_nhwc(maxpool2,name="packed_flatten")
     fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512/32->256/32
