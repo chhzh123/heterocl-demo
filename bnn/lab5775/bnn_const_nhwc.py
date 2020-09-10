@@ -53,11 +53,17 @@ def build_packed_bnn(input_image):
 
     conv1 = bnn.packed_conv2d_nhwc(input_image, w_conv1, padding=[1,1], name="conv1", out_dtype=qtype_int)
     bn1 = bnn.packed_batch_norm_threshold_nhwc(conv1, bn_t1, name="bn1")
-    maxpool1 = bnn.packed_max_pool2d_nhwc(bn1, [2,2], [2,2], name="maxpool1")
+    if not args.stream:
+        maxpool1 = bnn.packed_max_pool2d_nhwc(bn1, [2,2], [2,2], name="maxpool1")
+    else:
+        maxpool1 = bnn.packed_max_pool2d_nhwc_LB(bn1, [2,2], [2,2], name="maxpool1")
 
     conv2 = bnn.packed_conv2d_nhwc(maxpool1, w_conv2, padding=[1,1], name="conv2", out_dtype=qtype_int)
     bn2 = bnn.packed_batch_norm_threshold_nhwc(conv2, bn_t2, name="bn2")
-    maxpool2 = bnn.packed_max_pool2d_nhwc(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    if not args.stream:
+        maxpool2 = bnn.packed_max_pool2d_nhwc(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
+    else:
+        maxpool2 = bnn.packed_max_pool2d_nhwc_LB(bn2, [2,2], [2,2], name="maxpool2") # 32*4*4=512
 
     pack = bnn.packed_flatten_nhwc(maxpool2,name="packed_flatten")
     fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512/32->256/32
@@ -115,32 +121,40 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
             s[s_layer].pipeline(s_layer.axis[1])
-            s.partition(s_layer,dim=3)
+            if not args.stream:
+                s.partition(s_layer,dim=3)
         elif layer == "conv1":
-            s[s_layer].pipeline(s_layer.axis[3])
+            s[s_layer].pipeline(s_layer.axis[2])
             LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_layer],s_layer.axis[1], "LB1")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[2], "WB1")
-            s.partition(s_layer,dim=4)
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif layer == "bn1":
             s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=3)
+            if not args.stream:
+                s.partition(s_layer,dim=3)
         elif layer == "maxpool1":
             s[s_layer].pipeline(s_layer.axis[1])
-            s.partition(s_layer,dim=3)
+            if not args.stream:
+                s.partition(s_layer,dim=3)
         elif layer == "conv2_pad":
             s[s_layer].pipeline(s_layer.axis[1])
-            s.partition(s_layer,dim=3)
+            if not args.stream:
+                s.partition(s_layer,dim=3)
         elif layer == "conv2":
-            s[s_layer].pipeline(s_layer.axis[3])
+            s[s_layer].pipeline(s_layer.axis[2])
             LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_layer],s_layer.axis[1], "LB2")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[2], "WB2")
-            s.partition(s_layer,dim=4)
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif layer == "bn2":
             s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=3)
+            if not args.stream:
+                s.partition(s_layer,dim=3)
         elif layer == "maxpool2":
             s[s_layer].pipeline(s_layer.axis[1])
-            s.partition(s_layer,dim=3)
+            if not args.stream:
+                s.partition(s_layer,dim=3)
         elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "packed_flatten":
