@@ -36,7 +36,7 @@ else:
         dtype_out = hcl.Fixed(32,10)
     else:
         target = hcl.platform.zc706
-        target.config(compile="vivado_hls", mode="csyn", project="project-nhwc-2.prj")
+        target.config(compile="vivado_hls", mode="csyn")
         dtype_in = qtype_bit
         dtype_out = qtype_float
 
@@ -110,17 +110,17 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         if not("w_" in layer or "bn_" in layer or "b_" in layer or "_LB" in layer):
             new_layer.append(layer)
     layer_names = new_layer
+    s.partition(input_image,dim=3)
     for layer in layer_names:
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
             s[s_layer].pipeline(s_layer.axis[1])
-            s.partition(input_image)
-            # s.partition(s_layer,dim=3)
+            s.partition(s_layer,dim=3)
         elif layer == "conv1":
             s[s_layer].pipeline(s_layer.axis[3])
-            # LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_layer],s_layer.axis[1], "LB1")
-            # WB = s.reuse_at(LB,s[s_layer],s_layer.axis[2], "WB1")
-            s.partition(s_layer,dim=3)
+            LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_layer],s_layer.axis[1], "LB1")
+            WB = s.reuse_at(LB,s[s_layer],s_layer.axis[2], "WB1")
+            s.partition(s_layer,dim=4)
         elif layer == "bn1":
             s[s_layer].pipeline(s_layer.axis[2])
             s.partition(s_layer,dim=3)
@@ -129,12 +129,12 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s.partition(s_layer,dim=3)
         elif layer == "conv2_pad":
             s[s_layer].pipeline(s_layer.axis[1])
-            # s.partition(s_layer,dim=3)
+            s.partition(s_layer,dim=3)
         elif layer == "conv2":
             s[s_layer].pipeline(s_layer.axis[3])
-            # LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_layer],s_layer.axis[1], "LB2")
-            # WB = s.reuse_at(LB,s[s_layer],s_layer.axis[2], "WB2")
-            s.partition(s_layer,dim=3)
+            LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_layer],s_layer.axis[1], "LB2")
+            WB = s.reuse_at(LB,s[s_layer],s_layer.axis[2], "WB2")
+            s.partition(s_layer,dim=4)
         elif layer == "bn2":
             s[s_layer].pipeline(s_layer.axis[2])
             s.partition(s_layer,dim=3)
