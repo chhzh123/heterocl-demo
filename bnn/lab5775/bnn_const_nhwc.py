@@ -67,7 +67,7 @@ def build_packed_bnn(input_image):
 
     pack = bnn.packed_flatten_nhwc(maxpool2,name="packed_flatten")
     fc1 = bnn.packed_dense(pack, w_fc1, b_fc1, True, name="fc1") # 512/32->256/32
-    fc2 = bnn.packed_dense(fc1, w_fc2, b_fc2, False, name="fc2") # 256/32->10
+    fc2 = bnn.packed_dense(fc1, w_fc2, b_fc2, False, name="fc2", dtype=dtype_out) # 256/32->10
     return fc2
 
 # prepare numpy arrays for testing
