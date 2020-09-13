@@ -21,10 +21,11 @@ void matmul(FIX_FM_acc bottom[64],
 		buf[coo] = bias[coo];
 	}
 	for(int cii = 0; cii < 64; cii++) {
-#pragma HLS PIPELINE II=2
+#pragma HLS PIPELINE
+		FIX_FM_acc bot = bottom[cii];
 		for(int coo = 0; coo < 10; coo ++) {
 #pragma HLS UNROLL
-			buf[coo] = buf[coo] + bottom[cii] * weights[coo][cii];
+			buf[coo] = buf[coo] + bot * weights[coo][cii];
 		}
 	}
 	for(int coo = 0; coo < 10; coo ++) {

@@ -100,45 +100,67 @@ void pgconv64(uint64 bottom1[10][10],
 #pragma HLS array_partition variable=relu_weights dim=1 complete
 #pragma HLS array_partition variable=top dim=1 complete
 
-    biconv_row:for(int row = 1; row < 9; row ++){
-        biconv_col:for(int col = 1; col < 9; col ++) {
-#pragma HLS PIPELINE II=5
-            biconv_coo:for (int coo = 0; coo < 16; coo ++) {
-#pragma HLS UNROLL
-            	int w_i = c*16+coo;
-                uint6 tmp0 = compute_engine_64(bottom1[row-1][col-1], weights[w_i][0][0]);
-                uint6 tmp1 = compute_engine_64(bottom1[row-1][col  ], weights[w_i][0][1]);
-                uint6 tmp2 = compute_engine_64(bottom1[row-1][col+1], weights[w_i][0][2]);
-                uint6 tmp3 = compute_engine_64(bottom1[row  ][col-1], weights[w_i][1][0]);
-                uint6 tmp4 = compute_engine_64(bottom1[row  ][col  ], weights[w_i][1][1]);
-                uint6 tmp5 = compute_engine_64(bottom1[row  ][col+1], weights[w_i][1][2]);
-                uint6 tmp6 = compute_engine_64(bottom1[row+1][col-1], weights[w_i][2][0]);
-                uint6 tmp7 = compute_engine_64(bottom1[row+1][col  ], weights[w_i][2][1]);
-                uint6 tmp8 = compute_engine_64(bottom1[row+1][col+1], weights[w_i][2][2]);
-                uint8 sum = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
-
-                uint6 tmp00 = compute_engine_64(bottom0[row-1][col-1], weights[w_i][0][0]);
-                uint6 tmp01 = compute_engine_64(bottom0[row-1][col  ], weights[w_i][0][1]);
-                uint6 tmp02 = compute_engine_64(bottom0[row-1][col+1], weights[w_i][0][2]);
-                uint6 tmp03 = compute_engine_64(bottom0[row  ][col-1], weights[w_i][1][0]);
-                uint6 tmp04 = compute_engine_64(bottom0[row  ][col  ], weights[w_i][1][1]);
-                uint6 tmp05 = compute_engine_64(bottom0[row  ][col+1], weights[w_i][1][2]);
-                uint6 tmp06 = compute_engine_64(bottom0[row+1][col-1], weights[w_i][2][0]);
-                uint6 tmp07 = compute_engine_64(bottom0[row+1][col  ], weights[w_i][2][1]);
-                uint6 tmp08 = compute_engine_64(bottom0[row+1][col+1], weights[w_i][2][2]);
-                uint8 sum0 = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
-
-                if (sum > thres[coo]) {
-                    sum += sum0;
+    uint64 bot1_LB[3][10];
+    uint64 bot0_LB[3][10];
+    uint64 bot1_WB[3][3];
+    uint64 bot0_WB[3][3];
+    biconv_row:for(int row = 0; row < 10; row ++){ // 1-8
+        biconv_col:for(int col = 0; col < 10; col ++) { // 1-8
+#pragma HLS PIPELINE
+            // move up one row, update line buffer
+            bot1_LB[0][col] = bot1_LB[1][col];
+            bot1_LB[1][col] = bot1_LB[2][col];
+            bot1_LB[2][col] = bottom1[row][col];
+            bot0_LB[0][col] = bot0_LB[1][col];
+            bot0_LB[1][col] = bot0_LB[2][col];
+            bot0_LB[2][col] = bottom0[row][col];
+            if (0 < row && row < 9) { // move left one column, update window buffer
+                for (int LB_1 = 0; LB_1 < 3; ++LB_1) {
+                    bot1_WB[LB_1][0] = bot1_WB[LB_1][1];
+                    bot1_WB[LB_1][1] = bot1_WB[LB_1][2];
+                    bot1_WB[LB_1][2] = bot1_LB[LB_1][col];
+                    bot0_WB[LB_1][0] = bot0_WB[LB_1][1];
+                    bot0_WB[LB_1][1] = bot0_WB[LB_1][2];
+                    bot0_WB[LB_1][2] = bot0_LB[LB_1][col];
                 }
-                FIX_FM_acc norm = batch_norm(sum, bn_weights[coo], bn_bias[coo]);
-                top[coo][row][col] = relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
+                if (0 < col && col < 9) {
+                    biconv_coo:for (int coo = 0; coo < 16; coo ++) { // calculate all the channels
+                    #pragma HLS UNROLL
+                        int w_i = c*16+coo;
+                        uint6 tmp0 = compute_engine_64(bot1_WB[0][0], weights[w_i][0][0]);
+                        uint6 tmp1 = compute_engine_64(bot1_WB[0][1], weights[w_i][0][1]);
+                        uint6 tmp2 = compute_engine_64(bot1_WB[0][2], weights[w_i][0][2]);
+                        uint6 tmp3 = compute_engine_64(bot1_WB[1][0], weights[w_i][1][0]);
+                        uint6 tmp4 = compute_engine_64(bot1_WB[1][1], weights[w_i][1][1]);
+                        uint6 tmp5 = compute_engine_64(bot1_WB[1][2], weights[w_i][1][2]);
+                        uint6 tmp6 = compute_engine_64(bot1_WB[2][0], weights[w_i][2][0]);
+                        uint6 tmp7 = compute_engine_64(bot1_WB[2][1], weights[w_i][2][1]);
+                        uint6 tmp8 = compute_engine_64(bot1_WB[2][2], weights[w_i][2][2]);
+                        uint8 sum = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
 
+                        uint6 tmp00 = compute_engine_64(bot0_WB[0][0], weights[w_i][0][0]);
+                        uint6 tmp01 = compute_engine_64(bot0_WB[0][1], weights[w_i][0][1]);
+                        uint6 tmp02 = compute_engine_64(bot0_WB[0][2], weights[w_i][0][2]);
+                        uint6 tmp03 = compute_engine_64(bot0_WB[1][0], weights[w_i][1][0]);
+                        uint6 tmp04 = compute_engine_64(bot0_WB[1][1], weights[w_i][1][1]);
+                        uint6 tmp05 = compute_engine_64(bot0_WB[1][2], weights[w_i][1][2]);
+                        uint6 tmp06 = compute_engine_64(bot0_WB[2][0], weights[w_i][2][0]);
+                        uint6 tmp07 = compute_engine_64(bot0_WB[2][1], weights[w_i][2][1]);
+                        uint6 tmp08 = compute_engine_64(bot0_WB[2][2], weights[w_i][2][2]);
+                        uint8 sum0 = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
+
+                        if (sum > thres[coo]) {
+                            sum += sum0;
+                        }
+                        FIX_FM_acc norm = batch_norm(sum, bn_weights[coo], bn_bias[coo]);
+                        top[coo][row][col] = relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
+
+                    }
+                }
             }
         }
     }
 }
-
 
 template <unsigned CHANNEL>
 void pgconv64s2(uint64 bottom1[10][10],
@@ -168,43 +190,66 @@ void pgconv64s2(uint64 bottom1[10][10],
 
     int top_row = row_off*4 + 1;
     int top_col = col_off*4 + 1;
-    biconv_row:for(int row = 1; row < 9; row +=2){
-        biconv_col:for(int col = 1; col < 9; col +=2) {
-#pragma HLS PIPELINE II=5
-            biconv_coo:for (int coo = 0; coo < 16; coo ++) {
-#pragma HLS UNROLL
-                FIX_FM_acc d = top[coo][top_row][top_col];
-                int w_i = c*16+coo;
-                uint6 tmp0 = compute_engine_64(bottom1[row-1][col-1], weights[w_i][0][0]);
-                uint6 tmp1 = compute_engine_64(bottom1[row-1][col  ], weights[w_i][0][1]);
-                uint6 tmp2 = compute_engine_64(bottom1[row-1][col+1], weights[w_i][0][2]);
-                uint6 tmp3 = compute_engine_64(bottom1[row  ][col-1], weights[w_i][1][0]);
-                uint6 tmp4 = compute_engine_64(bottom1[row  ][col  ], weights[w_i][1][1]);
-                uint6 tmp5 = compute_engine_64(bottom1[row  ][col+1], weights[w_i][1][2]);
-                uint6 tmp6 = compute_engine_64(bottom1[row+1][col-1], weights[w_i][2][0]);
-                uint6 tmp7 = compute_engine_64(bottom1[row+1][col  ], weights[w_i][2][1]);
-                uint6 tmp8 = compute_engine_64(bottom1[row+1][col+1], weights[w_i][2][2]);
-                uint8 sum = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
-
-                uint6 tmp00 = compute_engine_64(bottom0[row-1][col-1], weights[w_i][0][0]);
-                uint6 tmp01 = compute_engine_64(bottom0[row-1][col  ], weights[w_i][0][1]);
-                uint6 tmp02 = compute_engine_64(bottom0[row-1][col+1], weights[w_i][0][2]);
-                uint6 tmp03 = compute_engine_64(bottom0[row  ][col-1], weights[w_i][1][0]);
-                uint6 tmp04 = compute_engine_64(bottom0[row  ][col  ], weights[w_i][1][1]);
-                uint6 tmp05 = compute_engine_64(bottom0[row  ][col+1], weights[w_i][1][2]);
-                uint6 tmp06 = compute_engine_64(bottom0[row+1][col-1], weights[w_i][2][0]);
-                uint6 tmp07 = compute_engine_64(bottom0[row+1][col  ], weights[w_i][2][1]);
-                uint6 tmp08 = compute_engine_64(bottom0[row+1][col+1], weights[w_i][2][2]);
-                uint8 sum0 = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
-
-                if (sum > thres[coo]) {
-                    sum += sum0;
+    uint64 bot1_LB[3][10];
+    uint64 bot0_LB[3][10];
+    uint64 bot1_WB[3][3];
+    uint64 bot0_WB[3][3];
+    biconv_row:for(int row = 0; row < 10; row ++){ // 1,3,5,7
+        biconv_col:for(int col = 0; col < 10; col ++) { // 1,3,5,7
+#pragma HLS PIPELINE
+            // update line buffer
+            bot1_LB[0][col] = bot1_LB[1][col];
+            bot1_LB[1][col] = bot1_LB[2][col];
+            bot1_LB[2][col] = bottom1[row][col];
+            bot0_LB[0][col] = bot0_LB[1][col];
+            bot0_LB[1][col] = bot0_LB[2][col];
+            bot0_LB[2][col] = bottom0[row][col];
+            if (row == 1 || row == 3 || row == 5 || row == 7) { // update window buffer
+                for (int LB_1 = 0; LB_1 < 3; ++LB_1) {
+                    bot1_WB[LB_1][0] = bot1_WB[LB_1][1];
+                    bot1_WB[LB_1][1] = bot1_WB[LB_1][2];
+                    bot1_WB[LB_1][2] = bot1_LB[LB_1][col];
+                    bot0_WB[LB_1][0] = bot0_WB[LB_1][1];
+                    bot0_WB[LB_1][1] = bot0_WB[LB_1][2];
+                    bot0_WB[LB_1][2] = bot0_LB[LB_1][col];
                 }
-                FIX_FM_acc norm = batch_norm(sum, bn_weights[coo], bn_bias[coo]);
-                top[coo][top_row][top_col] = d + relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
+                if (col == 1 || col == 3 || col == 5 || col == 7) {
+                    biconv_coo:for (int coo = 0; coo < 16; coo ++) {
+                    #pragma HLS UNROLL
+                        FIX_FM_acc d = top[coo][top_row][top_col];
+                        int w_i = c*16+coo;
+                        uint6 tmp0 = compute_engine_64(bot1_WB[0][0], weights[w_i][0][0]);
+                        uint6 tmp1 = compute_engine_64(bot1_WB[0][1], weights[w_i][0][1]);
+                        uint6 tmp2 = compute_engine_64(bot1_WB[0][2], weights[w_i][0][2]);
+                        uint6 tmp3 = compute_engine_64(bot1_WB[1][0], weights[w_i][1][0]);
+                        uint6 tmp4 = compute_engine_64(bot1_WB[1][1], weights[w_i][1][1]);
+                        uint6 tmp5 = compute_engine_64(bot1_WB[1][2], weights[w_i][1][2]);
+                        uint6 tmp6 = compute_engine_64(bot1_WB[2][0], weights[w_i][2][0]);
+                        uint6 tmp7 = compute_engine_64(bot1_WB[2][1], weights[w_i][2][1]);
+                        uint6 tmp8 = compute_engine_64(bot1_WB[2][2], weights[w_i][2][2]);
+                        uint8 sum = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
+
+                        uint6 tmp00 = compute_engine_64(bot0_WB[0][0], weights[w_i][0][0]);
+                        uint6 tmp01 = compute_engine_64(bot0_WB[0][1], weights[w_i][0][1]);
+                        uint6 tmp02 = compute_engine_64(bot0_WB[0][2], weights[w_i][0][2]);
+                        uint6 tmp03 = compute_engine_64(bot0_WB[1][0], weights[w_i][1][0]);
+                        uint6 tmp04 = compute_engine_64(bot0_WB[1][1], weights[w_i][1][1]);
+                        uint6 tmp05 = compute_engine_64(bot0_WB[1][2], weights[w_i][1][2]);
+                        uint6 tmp06 = compute_engine_64(bot0_WB[2][0], weights[w_i][2][0]);
+                        uint6 tmp07 = compute_engine_64(bot0_WB[2][1], weights[w_i][2][1]);
+                        uint6 tmp08 = compute_engine_64(bot0_WB[2][2], weights[w_i][2][2]);
+                        uint8 sum0 = sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
+
+                        if (sum > thres[coo]) {
+                            sum += sum0;
+                        }
+                        FIX_FM_acc norm = batch_norm(sum, bn_weights[coo], bn_bias[coo]);
+                        top[coo][top_row][top_col] = d + relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
+                    }
+                    top_row ++;
+                    top_col ++;
+                }
             }
-            top_row ++;
-            top_col ++;
         }
     }
 }

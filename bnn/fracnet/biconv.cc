@@ -57,24 +57,39 @@ void biconv16(uint16 bottom[32][32],
 #pragma HLS array_partition variable=weights dim=1 complete
 #pragma HLS array_partition variable=top dim=1 complete
 
-    biconv_row:for(int row = 1; row < 31; row ++){
-        biconv_col:for(int col = 1; col < 31; col ++) {
-#pragma HLS PIPELINE II=5
-            biconv_coo:for (int coo = 0; coo < 16; coo ++) {
-#pragma HLS UNROLL
-            	FIX_FM_acc d = top[coo][row][col];
+    uint64 bot_LB[3][32];
+    uint64 bot_WB[3][3];
+    biconv_row:for(int row = 0; row < 32; row ++){ // 1-31
+        biconv_col:for(int col = 0; col < 32; col ++) { // 1-31
+#pragma HLS PIPELINE
+            // move up one row, update line buffer
+            bot_LB[0][col] = bot_LB[1][col];
+            bot_LB[1][col] = bot_LB[2][col];
+            bot_LB[2][col] = bottom[row][col];
+            if (0 < row && row < 31) {// move left one column, update window buffer
+                for (int LB_1 = 0; LB_1 < 3; ++LB_1) {
+                    bot_WB[LB_1][0] = bot_WB[LB_1][1];
+                    bot_WB[LB_1][1] = bot_WB[LB_1][2];
+                    bot_WB[LB_1][2] = bot_LB[LB_1][col];
+                }
+                if (0 < col && col < 31) {
+                    biconv_coo:for (int coo = 0; coo < 16; coo ++) {
+                    #pragma HLS UNROLL
+                        FIX_FM_acc d = top[coo][row][col];
 
-                uint6 tmp0 = compute_engine_16(bottom[row-1][col-1], weights[coo][0][0]);
-                uint6 tmp1 = compute_engine_16(bottom[row-1][col  ], weights[coo][0][1]);
-                uint6 tmp2 = compute_engine_16(bottom[row-1][col+1], weights[coo][0][2]);
-                uint6 tmp3 = compute_engine_16(bottom[row  ][col-1], weights[coo][1][0]);
-                uint6 tmp4 = compute_engine_16(bottom[row  ][col  ], weights[coo][1][1]);
-                uint6 tmp5 = compute_engine_16(bottom[row  ][col+1], weights[coo][1][2]);
-                uint6 tmp6 = compute_engine_16(bottom[row+1][col-1], weights[coo][2][0]);
-                uint6 tmp7 = compute_engine_16(bottom[row+1][col  ], weights[coo][2][1]);
-                uint6 tmp8 = compute_engine_16(bottom[row+1][col+1], weights[coo][2][2]);
+                        uint6 tmp0 = compute_engine_16(bot_WB[0][0], weights[coo][0][0]);
+                        uint6 tmp1 = compute_engine_16(bot_WB[0][1], weights[coo][0][1]);
+                        uint6 tmp2 = compute_engine_16(bot_WB[0][2], weights[coo][0][2]);
+                        uint6 tmp3 = compute_engine_16(bot_WB[1][0], weights[coo][1][0]);
+                        uint6 tmp4 = compute_engine_16(bot_WB[1][1], weights[coo][1][1]);
+                        uint6 tmp5 = compute_engine_16(bot_WB[1][2], weights[coo][1][2]);
+                        uint6 tmp6 = compute_engine_16(bot_WB[2][0], weights[coo][2][0]);
+                        uint6 tmp7 = compute_engine_16(bot_WB[2][1], weights[coo][2][1]);
+                        uint6 tmp8 = compute_engine_16(bot_WB[2][2], weights[coo][2][2]);
 
-                top[coo][row][col] = d + sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
+                        top[coo][row][col] = d + sum_engine(tmp0, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8);
+                    }
+                }
             }
         }
     }
