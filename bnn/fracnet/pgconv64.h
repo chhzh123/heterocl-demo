@@ -216,7 +216,7 @@ void pgconv64s2(uint64 bottom1[10][10],
                 if (col == 1 || col == 3 || col == 5 || col == 7) {
                     biconv_coo:for (int coo = 0; coo < 16; coo ++) {
                     #pragma HLS UNROLL
-                        FIX_FM_acc d = top[coo][top_row][top_col];
+                        // FIX_FM_acc d = top[coo][top_row][top_col];
                         int w_i = c*16+coo;
                         uint6 tmp0 = compute_engine_64(bot1_WB[0][0], weights[w_i][0][0]);
                         uint6 tmp1 = compute_engine_64(bot1_WB[0][1], weights[w_i][0][1]);
@@ -244,7 +244,8 @@ void pgconv64s2(uint64 bottom1[10][10],
                             sum += sum0;
                         }
                         FIX_FM_acc norm = batch_norm(sum, bn_weights[coo], bn_bias[coo]);
-                        top[coo][top_row][top_col] = d + relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
+                        // top[coo][top_row][top_col] = d + relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
+                        top[coo][top_row][top_col] += relu(norm, relu_shiftx[coo], relu_shifty[coo], relu_weights[coo]);
                     }
                     top_row ++;
                     top_col ++;
