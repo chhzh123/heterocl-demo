@@ -4,7 +4,7 @@
 ## Copyright (C) 1986-2019 Xilinx, Inc. All Rights Reserved.
 ############################################################
 
-open_project fast.prj -reset
+open_project fracnet.prj -reset
 
 set_top ResNet
 
@@ -18,9 +18,9 @@ add_files weights.h
 open_solution "solution1"
 set_part {xczu3eg-sbva484-1-e}
 
-create_clock -period 5 -name default
+create_clock -period 4 -name default
 
 #csim_design
 csynth_design
 #cosim_design
-export_design -rtl verilog -format ip_catalog
+#export_design -rtl verilog -format ip_catalog
