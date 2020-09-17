@@ -2,6 +2,9 @@
 *.prj
 *.log
 *.txt
+*.out
+*.pt
+project
 
 .ipynb_checkpoints
 *.pyc

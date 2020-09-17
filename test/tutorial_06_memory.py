@@ -244,10 +244,14 @@ print(hcl.lower(s_final))
 ##############################################################################
 # Finally, we can generate the HLS code and see if the II is indeed 1.
 
-f = hcl.build(s_final, target="vhls")
-print(f)
-import sys
-sys.exit()
+# f = hcl.build(s_final, target="vhls")
+# print(f)
+# import sys
+# sys.exit()
+target = hcl.platform.zc706
+target.config(compile="vivado_hls",mode="csyn")
+f = hcl.build(s_final, target=target)
+f(hcl_A, hcl_F, hcl_Bxy)
 
 ##############################################################################
 # Following is a sample report from Vivado_HLS.

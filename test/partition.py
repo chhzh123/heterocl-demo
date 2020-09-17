@@ -61,8 +61,26 @@ def test_csyn():
     f = hcl.build(s,target)
     print(f)
 
+def test_reuse_before_streaming():
+    hcl.init()
+    A = hcl.placeholder((10, 10), name="A")
+    def kernel(A):
+        B = hcl.compute((10, 8), lambda y, x: A[y, x] + A[y, x+1] + A[y, x+2],name="B")
+        C = hcl.compute((10, 8), lambda y, x: B[y, x], name="C")
+        return C
+    s = hcl.create_schedule([A], kernel)
+    kernel_B = kernel.B
+    RB = s.reuse_at(A, s[kernel_B], kernel_B.axis[1])
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="debug")
+    s.to(kernel.B, target.xcel)
+    s.to(kernel.C, target.host)
+    f = hcl.build(s, target)
+    print(f)
+
 if __name__ == "__main__":
-    test()
+    # test()
     # test2()
     # test3()
     # test_csyn()
+    test_reuse_before_streaming()

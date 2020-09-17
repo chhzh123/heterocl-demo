@@ -21,9 +21,10 @@ def GEMM():
     s = hcl.create_schedule([matrix_1, matrix_2], kernel)
     out_matrix = kernel.out_matrix
     block_size = 8
-    y0, y1 = s[out_matrix].split(out_matrix.axis[0], factor=block_size)
-    x0, x1 = s[out_matrix].split(out_matrix.axis[1], factor=block_size)
-    s[out_matrix].reorder(y0, x0, y1, x1)
+    # y0, y1 = s[out_matrix].split(out_matrix.axis[0], factor=block_size)
+    # x0, x1 = s[out_matrix].split(out_matrix.axis[1], factor=block_size)
+    # s[out_matrix].reorder(y0, x0, y1, x1)
+    s[out_matrix].pipeline(out_matrix.axis[1])
     target = hcl.platform.zc706
     s.to([matrix_1, matrix_2], target.xcel)
     s.to(kernel.out_matrix, target.host)
@@ -36,7 +37,7 @@ def GEMM():
 
     f = hcl.build(s, target)
     f(hcl_m1, hcl_m2, hcl_m3)
-    report = f.report(target)
+    report = f.report()
 
 if __name__ == "__main__":
     GEMM()
