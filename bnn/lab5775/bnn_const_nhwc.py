@@ -113,7 +113,7 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     layer_names = list(build_packed_bnn.__dict__.keys())
     new_layer = []
     for layer in layer_names:
-        if not("w_" in layer or "bn_" in layer or "b_" in layer or "_LB" in layer):
+        if not("w_" in layer or "bn_" in layer or "b_" in layer or "_LB" in layer or "_res" in layer):
             new_layer.append(layer)
     layer_names = new_layer
     s.partition(input_image,dim=3)
@@ -171,12 +171,14 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     # streaming across layers
     if args.stream:
         print("[INFO] Use stream")
-        for i,layer in enumerate(layer_names):
-            if i == len(layer_names) - 1:
-                break
-            layer1 = getattr(build_packed_bnn,layer)
-            layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
-            s.to(layer1,s[layer2])
+        for i in range(len(layer_names) - 1):
+            if "maxpool" not in layer_names[i]:
+                layer1 = getattr(build_packed_bnn,layer_names[i])
+                layer2 = getattr(build_packed_bnn,layer_names[i+1])
+            else:
+                layer1 = getattr(build_packed_bnn,"maxpool{}_res".format(layer_names[i][-1]))
+                layer2 = getattr(build_packed_bnn,layer_names[i+1])
+            s.to(layer1,layer2)
 
     return hcl.build(s, target=target)
 

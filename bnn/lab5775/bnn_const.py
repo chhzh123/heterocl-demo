@@ -36,7 +36,7 @@ else:
         dtype_out = hcl.Fixed(32,10)
     else:
         target = hcl.platform.zc706
-        target.config(compile="vivado_hls", mode="csyn")
+        target.config(compile="vivado_hls", mode="csyn", project="test.prj")
         dtype_in = qtype_bit
         dtype_out = qtype_float
 
@@ -98,49 +98,52 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
 
     # compute optimization
     layer_names = list(build_packed_bnn.__dict__.keys())
-    layer_names.remove("w_conv1")
-    layer_names.remove("w_conv2")
-    layer_names.remove("bn_t1")
-    layer_names.remove("bn_t2")
-    layer_names.remove("w_fc1")
-    layer_names.remove("b_fc1")
-    layer_names.remove("w_fc2")
-    layer_names.remove("b_fc2")
-    layer_names.remove("maxpool1_LB")
-    layer_names.remove("maxpool2_LB")
+    new_layer = []
+    for layer in layer_names:
+        if not("w_" in layer or "b_" in layer or "bn_" in layer or "_LB" in layer or "_res" in layer):
+            new_layer.append(layer)
+    layer_names = new_layer
+    print(layer_names)
+
+    s.partition(input_image)
     for layer in layer_names:
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
             s[s_layer].pipeline(s_layer.axis[3 if args.stream else 2])
-            s.partition(input_image)
-            # s.partition(s_layer,dim=4)
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif layer == "conv1":
-            # s[s_layer].reorder(s_layer.axis[2],s_layer.axis[3],s_layer.axis[1])
             s[s_layer].pipeline(s_layer.axis[3])
             LB = s.reuse_at(build_packed_bnn.conv1_pad._op,s[s_layer],s_layer.axis[2], "LB1")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3], "WB1")
-            s.partition(s_layer,dim=2)
+            if not args.stream:
+                s.partition(s_layer,dim=2)
         elif layer == "bn1":
             s[s_layer].pipeline(s_layer.axis[4 if args.stream else 3])
-            s.partition(s_layer,dim=4)
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif layer == "maxpool1":
-            s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=4)
+            s[s_layer].pipeline(s_layer.axis[3 if args.stream else 2])
+            if not args.stream:
+                s.partition(build_packed_bnn.maxpool1_res,dim=4)
         elif layer == "conv2_pad":
             s[s_layer].pipeline(s_layer.axis[3 if args.stream else 2])
-            # s.partition(s_layer,dim=4)
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif layer == "conv2":
-            # s[s_layer].reorder(s_layer.axis[2],s_layer.axis[3],s_layer.axis[1])
             s[s_layer].pipeline(s_layer.axis[3])
             LB = s.reuse_at(build_packed_bnn.conv2_pad._op,s[s_layer],s_layer.axis[2], "LB2")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3], "WB2")
-            s.partition(s_layer,dim=2)
+            if not args.stream:
+                s.partition(s_layer,dim=2)
         elif layer == "bn2":
-            s[s_layer].pipeline(s_layer.axis[3]) # be careful of # channels
-            s.partition(s_layer,dim=4)
+            s[s_layer].pipeline(s_layer.axis[4 if args.stream else 3]) # be careful of # channels
+            if not args.stream:
+                s.partition(s_layer,dim=4)
         elif layer == "maxpool2":
-            s[s_layer].pipeline(s_layer.axis[2])
-            s.partition(s_layer,dim=4)
+            s[s_layer].pipeline(s_layer.axis[3 if args.stream else 2])
+            if not args.stream:
+                s.partition(build_packed_bnn.maxpool2_res,dim=4)
         elif "unpack" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "packed_flatten":
@@ -149,6 +152,8 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             s[s_layer].pipeline(s_layer.axis[2])
             s_fc1 = build_packed_bnn.fc1
             s[s_fc1].pipeline(s_fc1.axis[2 if args.stream else 1])
+            if not args.stream:
+                s.partition(s_fc1,dim=2)
         elif layer == "fc2_matmul":
             s[s_layer].pipeline(s_layer.axis[2])
             s_fc2 = build_packed_bnn.fc2
@@ -157,12 +162,14 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     # streaming across layers
     if args.stream:
         print("[INFO] Use stream")
-        for i,layer in enumerate(layer_names):
-            if i == len(layer_names) - 1:
-                break
-            layer1 = getattr(build_packed_bnn,layer)
-            layer2 = getattr(build_packed_bnn,list(layer_names)[i+1])
-            s.to(layer1,s[layer2])
+        for i in range(len(layer_names) - 1):
+            if "maxpool" not in layer_names[i]:
+                layer1 = getattr(build_packed_bnn,layer_names[i])
+                layer2 = getattr(build_packed_bnn,layer_names[i+1])
+            else:
+                layer1 = getattr(build_packed_bnn,"maxpool{}_res".format(layer_names[i][-1]))
+                layer2 = getattr(build_packed_bnn,layer_names[i+1])
+            s.to(layer1,layer2)
 
     return hcl.build(s, target=target)
 
