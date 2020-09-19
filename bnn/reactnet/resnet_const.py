@@ -208,14 +208,19 @@ def build_resnet20_stream_inf(target=target):
             if not args.stream:
                 s.partition(s_layer,dim=4)
         elif "conv" in layer and "pad" not in layer:
+            s[s_layer].pipeline(s_layer.axis[3])
             if "layer2_0" in layer or "layer3_0" in layer:
                 continue # stride=2
-            s[s_layer].pipeline(s_layer.axis[3])
             s_pad = getattr(build_resnet20,layer+"_pad")
             LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
-        elif "avgpool" in layer:
+        elif "concat" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
+        elif "avgpool" in layer:
+            if layer == "avgpool":
+                s[s_layer].pipeline(s_layer.axis[1]) # (hh,ww) = (1,1)
+            else:
+                s[s_layer].pipeline(s_layer.axis[2])
         elif "flatten" in layer:
             s[s_layer].pipeline(s_layer.axis[1])
         elif "fc_matmul" in layer:

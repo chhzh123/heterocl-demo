@@ -200,6 +200,8 @@ def build_resnet20_stream_inf(params, target=target):
             WB = s.reuse_at(LB,s[s_layer],s_layer.axis[3],layer+"_WB")
             # s.partition(ph_dict[layer+"_weight"],hcl.Partition.Cyclic,factor=3,dim=4) # avoid too many registers
             # s.partition(s_layer,dim=2) # avoid using with streaming
+        elif "concat" in layer:
+            s[s_layer].pipeline(s_layer.axis[2])
         elif "avgpool" in layer:
             s[s_layer].pipeline(s_layer.axis[2])
             # s.partition(s_layer,dim=4) # avoid using with streaming
