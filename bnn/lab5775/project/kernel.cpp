@@ -20,24 +20,21 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
     #pragma HLS INTERFACE s_axilite port=fc2 bundle=control
     #pragma HLS INTERFACE s_axilite port=return bundle=control
       ap_int<32> _top;
-      ap_uint<8> conv1_pad[1][18][18][1];
       ap_uint<8> conv1_pad_pipe_1[1][18][18][1];
       #pragma HLS dataflow
-      #pragma HLS stream variable=conv1_pad_pipe_1 depth=1
+      #pragma HLS stream variable=conv1_pad_pipe_1 depth=324
       conv1_pad_hh: for (ap_int<32> hh = 0; hh < 18; ++hh) {
-      #pragma HLS pipeline
         conv1_pad_ww: for (ap_int<32> ww = 0; ww < 18; ++ww) {
+        #pragma HLS pipeline
           ap_uint<8> conv1_pad_temp;
           conv1_pad_temp = ((ap_uint<8>)(((((1 <= ww) && (ww < 17)) && (1 <= hh)) && (hh < 17)) ? (((ap_uint<32>)input_image[0][(hh + -1)][(ww + -1)][0])) : ((ap_uint<32>)0U)));
           conv1_pad_pipe_1[0][hh][ww][0] = conv1_pad_temp;
-          conv1_pad[0][hh][ww][0] = conv1_pad_temp;
         }
       }
-      ap_int<6> conv1[1][16][16][16];
       ap_uint<8> LB1[1][3][18][1];
       ap_uint<8> WB1[1][3][3][1];
       ap_int<6> conv1_pipe_2[1][16][16][16];
-      #pragma HLS stream variable=conv1_pipe_2 depth=1
+      #pragma HLS stream variable=conv1_pipe_2 depth=4096
       conv1_yy_reuse: for (ap_int<32> yy_reuse = 0; yy_reuse < 18; ++yy_reuse) {
         conv1_xx_reuse: for (ap_int<32> xx_reuse = 0; xx_reuse < 18; ++xx_reuse) {
         #pragma HLS pipeline
@@ -75,7 +72,7 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
       }
       ap_uint<16> bn1[1][16][16][1];
       ap_uint<16> bn1_pipe_3[1][16][16][1];
-      #pragma HLS stream variable=bn1_pipe_3 depth=1
+      #pragma HLS stream variable=bn1_pipe_3 depth=256
       bn1_h: for (ap_int<32> h = 0; h < 16; ++h) {
         bn1_w: for (ap_int<32> w = 0; w < 16; ++w) {
         #pragma HLS pipeline
@@ -91,56 +88,45 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
           bn1_pipe_3[0][h][w][0] = bn1_temp;
         }
       }
-      ap_uint<16> maxpool1_res[1][8][8][1];
-      ap_uint<16> maxpool1_res_pipe_4[1][8][8][1];
-      #pragma HLS stream variable=maxpool1_res_pipe_4 depth=1
-      maxpool1_res_h1: for (ap_int<32> h1 = 0; h1 < 8; ++h1) {
-        maxpool1_res_w1: for (ap_int<32> w1 = 0; w1 < 8; ++w1) {
-          ap_uint<16> maxpool1_res_temp;
-          maxpool1_res_temp = (ap_uint<16>)0;
-          maxpool1_res_pipe_4[0][h1][w1][0] = maxpool1_res_temp;
-          maxpool1_res[0][h1][w1][0] = maxpool1_res_temp;
-        }
-      }
       ap_uint<16> maxpool1_LB[2][16];
-      ap_int<32> maxpool1;
-      maxpool1_hh1: for (ap_int<32> hh1 = 0; hh1 < 16; ++hh1) {
+      ap_uint<16> maxpool1_pipe_4[1][8][8][1];
+      #pragma HLS stream variable=maxpool1_pipe_4 depth=64
+      maxpool1_h1: for (bit32 h1 = 0; h1 < 8; ++h1) {
       #pragma HLS pipeline
-        maxpool1_ww1: for (ap_int<32> ww1 = 0; ww1 < 16; ++ww1) {
+      maxpool1_LB_i: for (bit32 maxpool1_LB_i = 0; maxpool1_LB_i < 2; ++maxpool1_LB_i) {
+            maxpool1_LB_j: for (bit32 maxpool1_LB_j = 0; maxpool1_LB_j < 16; ++maxpool1_LB_j) {
+              ap_uint<16> bn1_temp1;
+              bn1_temp1 = bn1_pipe_3[0][((h1 * 2) + maxpool1_LB_i)][maxpool1_LB_j][0];
+              maxpool1_LB[maxpool1_LB_i][maxpool1_LB_j] = bn1_temp1;
+            }
+          }
+        maxpool1_w1: for (bit32 w1 = 0; w1 < 8; ++w1) {
           ap_uint<16> maxpool1_val;
           maxpool1_val = (ap_uint<16>)0;
-          ap_uint<16> bn1_temp1;
-          bn1_temp1 = bn1_pipe_3[0][hh1][ww1][0];
-          maxpool1_LB[(hh1 % 2)][ww1] = bn1_temp1;
-          if (((hh1 % 2) == 1) && ((ww1 % 2) == 1)) {
-            maxpool1_ry: for (ap_int<32> maxpool1_ry = 0; maxpool1_ry < 2; ++maxpool1_ry) {
-              maxpool1_rx: for (ap_int<32> maxpool1_rx = 0; maxpool1_rx < 2; ++maxpool1_rx) {
-                maxpool1_val = (maxpool1_val | maxpool1_LB[maxpool1_ry][((ww1 + maxpool1_rx) + -1)]);
-              }
+          maxpool1_r: for (bit32 maxpool1_r = 0; maxpool1_r < 2; ++maxpool1_r) {
+            maxpool1_c: for (bit32 maxpool1_c = 0; maxpool1_c < 2; ++maxpool1_c) {
+              maxpool1_val = (maxpool1_val | maxpool1_LB[maxpool1_r][((w1 * 2) + maxpool1_c)]);
             }
-            maxpool1_res[0][(hh1 / 2)][(ww1 / 2)][0] = maxpool1_val;
           }
+          ap_uint<16> maxpool1_temp;
+          maxpool1_temp = maxpool1_val;
+          maxpool1_pipe_4[0][h1][w1][0] = maxpool1_temp;
         }
       }
-      ap_uint<16> conv2_pad[1][10][10][1];
       ap_uint<16> conv2_pad_pipe_5[1][10][10][1];
-      #pragma HLS stream variable=conv2_pad_pipe_5 depth=1
+      #pragma HLS stream variable=conv2_pad_pipe_5 depth=100
       conv2_pad_hh2: for (ap_int<32> hh2 = 0; hh2 < 10; ++hh2) {
-      #pragma HLS pipeline
         conv2_pad_ww2: for (ap_int<32> ww2 = 0; ww2 < 10; ++ww2) {
-          ap_uint<16> maxpool1_res_temp1;
-          maxpool1_res_temp1 = maxpool1_res_pipe_4[0][(hh2 + -1)][(ww2 + -1)][0];
+        #pragma HLS pipeline
           ap_uint<16> conv2_pad_temp;
-          conv2_pad_temp = ((ap_uint<16>)(((((1 <= ww2) && (ww2 < 9)) && (1 <= hh2)) && (hh2 < 9)) ? (((ap_uint<32>)maxpool1_res_temp1)) : ((ap_uint<32>)0U)));
+          conv2_pad_temp = ((ap_uint<16>)(((((1 <= ww2) && (ww2 < 9)) && (1 <= hh2)) && (hh2 < 9)) ? (((ap_uint<32>)maxpool1_pipe_4[0][(hh2 + -1)][(ww2 + -1)][0])) : ((ap_uint<32>)0U)));
           conv2_pad_pipe_5[0][hh2][ww2][0] = conv2_pad_temp;
-          conv2_pad[0][hh2][ww2][0] = conv2_pad_temp;
         }
       }
-      ap_int<6> conv2[1][8][8][32];
       ap_uint<16> LB2[1][3][10][1];
       ap_uint<16> WB2[1][3][3][1];
       ap_int<6> conv2_pipe_6[1][8][8][32];
-      #pragma HLS stream variable=conv2_pipe_6 depth=1
+      #pragma HLS stream variable=conv2_pipe_6 depth=2048
       conv2_yy_reuse1: for (ap_int<32> yy_reuse1 = 0; yy_reuse1 < 10; ++yy_reuse1) {
         conv2_xx_reuse1: for (ap_int<32> xx_reuse1 = 0; xx_reuse1 < 10; ++xx_reuse1) {
         #pragma HLS pipeline
@@ -178,7 +164,7 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
       }
       ap_uint<32> bn2[1][8][8][1];
       ap_uint<32> bn2_pipe_7[1][8][8][1];
-      #pragma HLS stream variable=bn2_pipe_7 depth=1
+      #pragma HLS stream variable=bn2_pipe_7 depth=64
       bn2_h2: for (ap_int<32> h2 = 0; h2 < 8; ++h2) {
         bn2_w2: for (ap_int<32> w2 = 0; w2 < 8; ++w2) {
         #pragma HLS pipeline
@@ -194,51 +180,45 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
           bn2_pipe_7[0][h2][w2][0] = bn2_temp;
         }
       }
-      ap_uint<32> maxpool2_res[1][4][4][1];
-      ap_uint<32> maxpool2_res_pipe_8[1][4][4][1];
-      #pragma HLS stream variable=maxpool2_res_pipe_8 depth=1
-      maxpool2_res_h3: for (ap_int<32> h3 = 0; h3 < 4; ++h3) {
-        maxpool2_res_w3: for (ap_int<32> w3 = 0; w3 < 4; ++w3) {
-          ap_uint<32> maxpool2_res_temp;
-          maxpool2_res_temp = 0U;
-          maxpool2_res_pipe_8[0][h3][w3][0] = maxpool2_res_temp;
-          maxpool2_res[0][h3][w3][0] = maxpool2_res_temp;
-        }
-      }
-      ap_uint<32> maxpool2_LB[2][8];
-      ap_int<32> maxpool2;
-      maxpool2_hh3: for (ap_int<32> hh3 = 0; hh3 < 8; ++hh3) {
+      ubit32 maxpool2_LB[2][8];
+      ubit32 maxpool2_pipe_8[1][4][4][1];
+      #pragma HLS stream variable=maxpool2_pipe_8 depth=16
+      maxpool2_h3: for (bit32 h3 = 0; h3 < 4; ++h3) {
       #pragma HLS pipeline
-        maxpool2_ww3: for (ap_int<32> ww3 = 0; ww3 < 8; ++ww3) {
-          ap_uint<32> maxpool2_val;
-          maxpool2_val = 0U;
-          ap_uint<32> bn2_temp1;
-          bn2_temp1 = bn2_pipe_7[0][hh3][ww3][0];
-          maxpool2_LB[(hh3 % 2)][ww3] = bn2_temp1;
-          if (((hh3 % 2) == 1) && ((ww3 % 2) == 1)) {
-            maxpool2_ry: for (ap_int<32> maxpool2_ry = 0; maxpool2_ry < 2; ++maxpool2_ry) {
-              maxpool2_rx: for (ap_int<32> maxpool2_rx = 0; maxpool2_rx < 2; ++maxpool2_rx) {
-                maxpool2_val = (maxpool2_val | maxpool2_LB[maxpool2_ry][((ww3 + maxpool2_rx) + -1)]);
-              }
+      maxpool2_LB_i: for (bit32 maxpool2_LB_i = 0; maxpool2_LB_i < 2; ++maxpool2_LB_i) {
+            maxpool2_LB_j: for (bit32 maxpool2_LB_j = 0; maxpool2_LB_j < 8; ++maxpool2_LB_j) {
+              ubit32 bn2_temp1;
+              bn2_temp1 = bn2_pipe_7[0][((h3 * 2) + maxpool2_LB_i)][maxpool2_LB_j][0];
+              maxpool2_LB[maxpool2_LB_i][maxpool2_LB_j] = bn2_temp1;
             }
-            maxpool2_res[0][(hh3 / 2)][(ww3 / 2)][0] = maxpool2_val;
           }
+        maxpool2_w3: for (bit32 w3 = 0; w3 < 4; ++w3) {
+          ubit32 maxpool2_val;
+          maxpool2_val = 0U;
+          maxpool2_r: for (bit32 maxpool2_r = 0; maxpool2_r < 2; ++maxpool2_r) {
+            maxpool2_c: for (bit32 maxpool2_c = 0; maxpool2_c < 2; ++maxpool2_c) {
+              maxpool2_val = (maxpool2_val | maxpool2_LB[maxpool2_r][((w3 * 2) + maxpool2_c)]);
+            }
+          }
+          ubit32 maxpool2_temp;
+          maxpool2_temp = maxpool2_val;
+          maxpool2_pipe_8[0][h3][w3][0] = maxpool2_temp;
         }
       }
       ap_int<32> packed_flatten[1][16];
       ap_int<32> packed_flatten_pipe_9[1][16];
-      #pragma HLS stream variable=packed_flatten_pipe_9 depth=1
+      #pragma HLS stream variable=packed_flatten_pipe_9 depth=16
       packed_flatten_j: for (ap_int<32> j = 0; j < 16; ++j) {
       #pragma HLS pipeline
         ap_uint<32> maxpool2_res_temp1;
-        maxpool2_res_temp1 = maxpool2_res_pipe_8[0][0][j][0];
+        maxpool2_res_temp1 = maxpool2_pipe_8[0][0][j][0];
         ap_int<32> packed_flatten_temp;
         packed_flatten_temp = ((ap_int<32>)maxpool2_res_temp1);
         packed_flatten_pipe_9[0][j] = packed_flatten_temp;
       }
       ap_int<32> fc1_matmul[1][256];
       ap_int<32> fc1_matmul_pipe_10[1][256];
-      #pragma HLS stream variable=fc1_matmul_pipe_10 depth=1
+      #pragma HLS stream variable=fc1_matmul_pipe_10 depth=256
       fc1_matmul_j1: for (ap_int<32> j1 = 0; j1 < 256; ++j1) {
         ap_int<32> fc1_popcnt;
         fc1_popcnt = 0;
@@ -256,7 +236,7 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
       }
       ap_int<32> fc1[1][8];
       ap_int<32> fc1_pipe_11[1][8];
-      #pragma HLS stream variable=fc1_pipe_11 depth=1
+      #pragma HLS stream variable=fc1_pipe_11 depth=8
       fc1_j2: for (ap_int<32> j2 = 0; j2 < 8; ++j2) {
         ap_int<32> fc1_pack;
         fc1_pack = 0;
@@ -272,7 +252,7 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
       }
       ap_int<32> fc2_matmul[1][10];
       ap_int<32> fc2_matmul_pipe_12[1][10];
-      #pragma HLS stream variable=fc2_matmul_pipe_12 depth=1
+      #pragma HLS stream variable=fc2_matmul_pipe_12 depth=10
       fc2_matmul_j3: for (ap_int<32> j3 = 0; j3 < 10; ++j3) {
         ap_int<32> fc2_popcnt;
         fc2_popcnt = 0;
