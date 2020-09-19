@@ -155,8 +155,8 @@ def test_complex():
     def kernel(A):
         B = hcl.compute(A.shape, 
                 lambda i: A[i] + 1, "B")
-        C = hcl.compute(B.shape,
-                lambda i: hcl.select(i < 9, B[i] + B[i+1], B[i]),"C")
+        C = hcl.compute((11,),
+                lambda i: hcl.select(i > 0, B[i], 0),"C")
         return C
 
     target = hcl.platform.zc706
@@ -167,7 +167,7 @@ def test_complex():
     s.to(kernel.B, s[kernel.C])
     f = hcl.build(s, target)
     np_A = np.zeros((10,))
-    np_C = np.zeros((10,))
+    np_C = np.zeros((11,))
     hcl_A = hcl.asarray(np_A)
     hcl_C = hcl.asarray(np_C)
     f(hcl_A, hcl_C)
@@ -306,8 +306,8 @@ if __name__ == "__main__":
     # test_consecutive()
     # test_duplicated()
     # test_residual2()
-    # test_complex()
+    test_complex()
     # test_imperative()
     # test_hierarchy()
     # test_dataflow()
-    test_interface()
+    # test_interface()
