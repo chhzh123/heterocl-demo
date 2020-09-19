@@ -10,7 +10,8 @@
 #include <math.h>
 #include <stdint.h>
 #include "const.h"
-
+typedef ap_int<32> bit32;
+typedef ap_uint<32> ubit32;
 
 extern "C" {
 void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
