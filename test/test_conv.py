@@ -25,7 +25,7 @@ def conv1():
     s[kernel.B].pipeline(kernel.B.axis[1])
 
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csyn",project="conv1")
+    target.config(compile="vivado_hls",mode="csim|csyn",project="conv1")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
@@ -53,7 +53,7 @@ def conv2():
     s[kernel.B].pipeline(kernel.B.axis[1])
     
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csyn",project="conv2")
+    target.config(compile="vivado_hls",mode="csim|csyn",project="conv2")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape))
@@ -79,7 +79,7 @@ def conv3():
     s[kernel.B].pipeline(kernel.B.axis[1])
 
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csyn",project="conv3")
+    target.config(compile="vivado_hls",mode="csim|csyn",project="conv3")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
@@ -111,5 +111,5 @@ def conv4():
 if __name__ == "__main__":
     # conv1()
     # conv2()
-    # conv3()
-    conv4()
+    conv3()
+    # conv4()

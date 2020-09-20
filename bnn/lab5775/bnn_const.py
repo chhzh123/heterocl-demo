@@ -36,7 +36,7 @@ else:
         dtype_out = hcl.Fixed(32,10)
     else:
         target = hcl.platform.zc706
-        target.config(compile="vivado_hls", mode="csyn", project="test.prj")
+        target.config(compile="vivado_hls", mode="csim|csyn")
         dtype_in = qtype_bit
         dtype_out = qtype_float
 
