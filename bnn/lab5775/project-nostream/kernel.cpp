@@ -23,10 +23,10 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
       ap_uint<8> conv1_pad[1][18][18][1];
       #pragma HLS array_partition variable=conv1_pad complete dim=3
       ap_int<32> conv1_pad_partitioned;
-      conv1_pad_hh: for (ap_int<32> hh = 0; hh < 18; ++hh) {
+      conv1_pad_hh: for (ap_int<32> hh = 1; hh < 17; ++hh) {
       #pragma HLS pipeline
-        conv1_pad_ww: for (ap_int<32> ww = 0; ww < 18; ++ww) {
-          conv1_pad[0][hh][ww][0] = ((ap_uint<8>)(((((1 <= ww) && (ww < 17)) && (1 <= hh)) && (hh < 17)) ? (((ap_uint<32>)input_image[0][(hh + -1)][(ww + -1)][0])) : ((ap_uint<32>)0U)));
+        conv1_pad_ww: for (ap_int<32> ww = 1; ww < 17; ++ww) {
+          conv1_pad[0][hh][ww][0] = (ap_uint<8>)input_image[0][(hh + -1)][(ww + -1)][0];//((ap_uint<8>)(((((1 <= ww) && (ww < 17)) && (1 <= hh)) && (hh < 17)) ? (((ap_uint<32>)input_image[0][(hh + -1)][(ww + -1)][0])) : ((ap_uint<32>)0U)));
         }
       }
       ap_int<6> conv1[1][16][16][16];
@@ -98,10 +98,10 @@ void test(ap_uint<8> input_image[1][16][16][1], ap_fixed<32, 22> fc2[1][10]) {
       ap_uint<16> conv2_pad[1][10][10][1];
       #pragma HLS array_partition variable=conv2_pad complete dim=3
       ap_int<32> conv2_pad_partitioned;
-      conv2_pad_hh1: for (ap_int<32> hh1 = 0; hh1 < 10; ++hh1) {
+      conv2_pad_hh1: for (ap_int<32> hh1 = 1; hh1 < 9; ++hh1) {
       #pragma HLS pipeline
-        conv2_pad_ww1: for (ap_int<32> ww1 = 0; ww1 < 10; ++ww1) {
-          conv2_pad[0][hh1][ww1][0] = ((ap_uint<16>)(((((1 <= ww1) && (ww1 < 9)) && (1 <= hh1)) && (hh1 < 9)) ? (((ap_uint<32>)maxpool1[0][(hh1 + -1)][(ww1 + -1)][0])) : ((ap_uint<32>)0U)));
+        conv2_pad_ww1: for (ap_int<32> ww1 = 1; ww1 < 9; ++ww1) {
+          conv2_pad[0][hh1][ww1][0] = (ap_uint<16>)maxpool1[0][(hh1 + -1)][(ww1 + -1)][0];//((ap_uint<16>)(((((1 <= ww1) && (ww1 < 9)) && (1 <= hh1)) && (hh1 < 9)) ? (((ap_uint<32>)maxpool1[0][(hh1 + -1)][(ww1 + -1)][0])) : ((ap_uint<32>)0U)));
         }
       }
       ap_int<6> conv2[1][8][8][32];
