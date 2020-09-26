@@ -1,6 +1,7 @@
 import heterocl as hcl
 import hlib.op.bnn as bnn
 import numpy as np
+from functools import reduce
 import os, time, sys, argparse
 from heterocl.profiler import Profiler
 
@@ -36,7 +37,7 @@ else:
         dtype_out = hcl.Fixed(32,10)
     else:
         target = hcl.platform.zc706
-        target.config(compile="vivado_hls", mode="csyn")
+        target.config(compile="vivado_hls", mode="csim|csyn|cosim", project="project-cosim-test")
         dtype_in = qtype_bit
         dtype_out = qtype_float
 
@@ -120,7 +121,7 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
     for layer in layer_names:
         s_layer = getattr(build_packed_bnn,layer)
         if layer == "conv1_pad":
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[2 if args.stream else 1])
             if not args.stream:
                 s.partition(s_layer,dim=3)
         elif layer == "conv1":
@@ -134,11 +135,11 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             if not args.stream:
                 s.partition(s_layer,dim=3)
         elif layer == "maxpool1":
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[2 if args.stream else 1])
             if not args.stream:
                 s.partition(s_layer,dim=3)
         elif layer == "conv2_pad":
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[2 if args.stream else 1])
             if not args.stream:
                 s.partition(s_layer,dim=3)
         elif layer == "conv2":
@@ -148,11 +149,11 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             if not args.stream:
                 s.partition(s_layer,dim=4)
         elif layer == "bn2":
-            s[s_layer].pipeline(s_layer.axis[2])
+            s[s_layer].pipeline(s_layer.axis[2]) # axis3 =1
             if not args.stream:
                 s.partition(s_layer,dim=3)
         elif layer == "maxpool2":
-            s[s_layer].pipeline(s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[2 if args.stream else 1])
             if not args.stream:
                 s.partition(s_layer,dim=3)
         elif "unpack" in layer:
@@ -160,11 +161,15 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
         elif layer == "packed_flatten":
             s[s_layer].pipeline(s_layer.axis[1])
         elif layer == "fc1_matmul":
-            s[s_layer].pipeline(s_layer.axis[2])
+            # s[s_layer].reorder(s_layer.axis[2],s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[1])
             s_fc1 = build_packed_bnn.fc1
-            s[s_fc1].pipeline(s_fc1.axis[2])
+            s[s_fc1].pipeline(s_fc1.axis[2 if args.stream else 1])
+            if not args.stream:
+                s.partition(s_fc1,dim=2)
         elif layer == "fc2_matmul":
-            s[s_layer].pipeline(s_layer.axis[2])
+            # s[s_layer].reorder(s_layer.axis[2],s_layer.axis[1])
+            s[s_layer].pipeline(s_layer.axis[1])
             s_fc2 = build_packed_bnn.fc2
             s[s_fc2].pipeline(s_fc2.axis[1])
 
@@ -175,10 +180,15 @@ def build_bitpacked_bnn_inf_opt(batch_size=batch_size,target=target):
             if "maxpool" not in layer_names[i]:
                 layer1 = getattr(build_packed_bnn,layer_names[i])
                 layer2 = getattr(build_packed_bnn,layer_names[i+1])
+                shape = layer1._op.shape
             else:
-                layer1 = getattr(build_packed_bnn,"maxpool{}_res".format(layer_names[i][-1]))
+                maxpool_s = getattr(build_packed_bnn,"maxpool{}".format(layer_names[i][-1]))
+                layer1 = getattr(maxpool_s,"maxpool{}_res".format(layer_names[i][-1]))
                 layer2 = getattr(build_packed_bnn,layer_names[i+1])
-            s.to(layer1,layer2)
+                shape = getattr(build_packed_bnn,"maxpool{}_res".format(layer_names[i][-1]))._op.shape
+            import heterocl.tvm as tvm
+            depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
+            s.to(layer1, layer2, depth=depth.value)
 
     return hcl.build(s, target=target)
 
