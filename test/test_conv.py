@@ -25,7 +25,7 @@ def conv1():
     s[kernel.B].pipeline(kernel.B.axis[1])
 
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csim|csyn",project="conv1")
+    target.config(compile="vivado_hls",mode="csyn",project="conv1")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
@@ -53,7 +53,7 @@ def conv2():
     s[kernel.B].pipeline(kernel.B.axis[1])
     
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csim|csyn",project="conv2")
+    target.config(compile="vivado_hls",mode="csyn",project="conv2")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape))
@@ -79,7 +79,7 @@ def conv3():
     s[kernel.B].pipeline(kernel.B.axis[1])
 
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csim|csyn",project="conv3")
+    target.config(compile="vivado_hls",mode="csyn|cosim",project="conv3")
     f = hcl.build(s, target=target)
     hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
     hcl_B = hcl.asarray(np.zeros((SIZE-KERNEL_SIZE+1, SIZE-KERNEL_SIZE+1)))
@@ -97,19 +97,45 @@ def conv4():
     s_conv = kernel.conv1
     LB = s.reuse_at(kernel.conv1_pad._op, s[s_conv], s_conv.axis[2], "LB")
     WB = s.reuse_at(LB, s[s_conv], s_conv.axis[3], "WB")
+    s[kernel.B].pipeline(kernel.B.axis[2])
 
     target = hcl.platform.zc706
-    target.config(compile="vivado_hls",mode="csim",project="conv")
+    target.config(compile="vivado_hls",mode="csim|csyn|cosim",project="conv")
     s.to([A, F], target.xcel)
     s.to(kernel.conv1, target.host)
     f = hcl.build(s, target=target)
-    hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
-    hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape))
-    hcl_B = hcl.asarray(np.zeros((16,8,8,8)))
+    hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape), dtype)
+    hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape), dtype)
+    hcl_B = hcl.asarray(np.zeros((1,16,8,8)), hcl.UInt(16))
+    f(hcl_A, hcl_F, hcl_B)
+
+def conv5():
+    dtype = hcl.UInt(4)
+    A = hcl.placeholder((1, 1, 3, 3), name="A", dtype=dtype)
+    F = hcl.placeholder((2, 1, 3, 3), name="F", dtype=dtype)
+
+    def kernel(A, F):
+        return bnn.conv2d_nchw(A, F, padding=[1,1], name="conv1", out_dtype=hcl.UInt(16))
+
+    s = hcl.create_schedule([A, F], kernel)
+    s_conv = kernel.conv1
+    LB = s.reuse_at(kernel.conv1_pad._op, s[s_conv], s_conv.axis[2], "LB")
+    WB = s.reuse_at(LB, s[s_conv], s_conv.axis[3], "WB")
+    s[kernel.conv1].pipeline(kernel.conv1.axis[2])
+
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls",mode="csim|csyn|cosim",project="conv5")
+    s.to([A, F], target.xcel)
+    s.to(kernel.conv1, target.host)
+    f = hcl.build(s, target=target)
+    hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape), dtype)
+    hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape), dtype)
+    hcl_B = hcl.asarray(np.zeros((1,2,3,3)), hcl.UInt(16))
     f(hcl_A, hcl_F, hcl_B)
 
 if __name__ == "__main__":
     # conv1()
     # conv2()
-    conv3()
+    # conv3()
     # conv4()
+    conv5()
