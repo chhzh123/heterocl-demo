@@ -22,25 +22,9 @@
 
 int main(int argc, char ** argv) {
   std::cout << " Initialize shared memory...\n";
-  uint8_t* arg_0 = (uint8_t*)shmat(/*input_image*/31457736, nullptr, 0);
-  auto input_image = new ap_uint<8>[1][16][16][1];
-  for (size_t i0 = 0; i0 < 1; i0++) {
-    for (size_t i1 = 0; i1 < 16; i1++) {
-      for (size_t i2 = 0; i2 < 16; i2++) {
-        for (size_t i3 = 0; i3 < 1; i3++) {
-          input_image[i0][i1][i2][i3] = 0; //(uint8_t)(arg_0[i3 + i2*1 + i1*16 + i0*256]);
-        }
-      }
-    }
-  }
+auto input_image = new ap_uint<8>[1][16][16][1];
 
-  int32_t* arg_1 = (int32_t*)shmat(/*fc2*/31490506, nullptr, 0);
-  auto fc2 = new ap_fixed<32,22>[1][10];
-  for (size_t i0 = 0; i0 < 1; i0++) {
-    for (size_t i1 = 0; i1 < 10; i1++) {
-      fc2[i0][i1] = 0; //(int32_t)(arg_1[i1 + i0*10]) >> 10;
-    }
-  }
+auto fc2 = new ap_fixed<32,22>[1][10];
 
   std::cout << " Initialize RTE...\n";
 
@@ -115,22 +99,6 @@ int main(int argc, char ** argv) {
 
   // execution on host 
 
-  for (size_t i0 = 0; i0 < 1; i0++) {
-    for (size_t i1 = 0; i1 < 16; i1++) {
-      for (size_t i2 = 0; i2 < 16; i2++) {
-        for (size_t i3 = 0; i3 < 1; i3++) {
-          ;//arg_0[i3 + i2*1 + i1*16 + i0*256] = (uint8_t)(input_image[i0][i1][i2][i3]);
-        }
-      }
-    }
-  }
-  shmdt(arg_0);
-  for (size_t i0 = 0; i0 < 1; i0++) {
-    for (size_t i1 = 0; i1 < 10; i1++) {
-      ;//arg_1[i1 + i0*10] = (int32_t)(fc2[i0][i1]) << 10;
-    }
-  }
-  shmdt(arg_1);
 
 
   }
