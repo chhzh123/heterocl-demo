@@ -98,6 +98,33 @@ def test_consecutive():
     hcl_C = hcl.asarray(np_C)
     f(hcl_A, hcl_C)
 
+def test_inconsistent():
+    dtype = hcl.UInt(8)
+    A = hcl.placeholder((10,), "A", dtype)
+
+    def kernel(A):
+        B = hcl.compute(A.shape, 
+                lambda i: A[i] + 1, "B", dtype)
+        rb = hcl.reduce_axis(0, 8)
+        C = hcl.compute(B.shape,
+                lambda i: hcl.sum(B[i][rb], axis=rb), "C", dtype)
+        return C
+
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls", mode="csim|csyn")
+    s = hcl.create_schedule([A], kernel)
+    s.reuse_at(kernel.B,s[kernel.C],kernel.B.axis[0],"LB")
+    # print(hcl.lower(s))
+    s.to([A], target.xcel)
+    s.to(kernel.C, target.host)
+    s.to(kernel.B, s[kernel.C])
+    f = hcl.build(s, target)
+    np_A = np.zeros((10,))
+    np_C = np.zeros((10,))
+    hcl_A = hcl.asarray(np_A,dtype)
+    hcl_C = hcl.asarray(np_C,dtype)
+    f(hcl_A, hcl_C)
+
 def test_zero():
     A = hcl.placeholder((10,), "A")
 
@@ -332,7 +359,7 @@ if __name__ == "__main__":
     # test_simple_reuse()
     # test_residual()
     # test_consecutive()
-    test_zero()
+    # test_zero()
     # test_duplicated()
     # test_residual2()
     # test_complex()
@@ -340,3 +367,4 @@ if __name__ == "__main__":
     # test_hierarchy()
     # test_dataflow()
     # test_interface()
+    test_inconsistent()
