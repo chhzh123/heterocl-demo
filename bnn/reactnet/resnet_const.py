@@ -32,7 +32,7 @@ else: # vhls
     target = hcl.platform.zc706
     if args.vitis:
         print("Use Vitis to compile")
-        target.config(compile="vitis", mode="hw_exe")
+        target.config(compile="vitis", mode="hw_exe", project="project-vitis")
     else:
         target.config(compile="vivado_hls", mode="csim|csyn|cosim")
 
