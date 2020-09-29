@@ -2,6 +2,7 @@ import heterocl as hcl
 import hlib.op.bnn as bnn
 import hlib.op.nn as nn
 import numpy as np
+from functools import reduce
 import os, time, sys, argparse
 import torch
 import torchvision
@@ -33,7 +34,7 @@ else: # vhls
         print("Use Vitis to compile")
         target.config(compile="vitis", mode="hw_exe")
     else:
-        target.config(compile="vivado_hls", mode="csyn")
+        target.config(compile="vivado_hls", mode="csim|csyn|cosim")
 
 def RSign(data, alpha, name="rsign", dtype=hcl.UInt(1)):
     assert data.shape[1] == alpha.shape[0]
@@ -162,7 +163,7 @@ class ResNet():
         return self.forward(x)
 
     def forward(self, x):
-        conv1 = nn.conv2d_nchw(x, self.params["conv1"], strides=[1, 1], padding=[1, 1], name="conv1", out_dtype=qtype_float)
+        conv1 = nn.conv2d_nchw(x, self.params["conv1"], strides=[1, 1], padding=[1, 1], name="conv0", out_dtype=qtype_float)
         bn, _, _ = nn.batch_norm(conv1, *self.params["bn1"], name="bn1",dtype=qtype_float)
         layer1 = self.layer1(bn)
         layer2 = self.layer2(layer1)
@@ -209,7 +210,8 @@ def build_resnet20_stream_inf(target=target):
                 s.partition(s_layer,dim=4)
         elif "conv" in layer and "pad" not in layer:
             s[s_layer].pipeline(s_layer.axis[3])
-            if "layer2_0" in layer or "layer3_0" in layer:
+            s[s_layer].reorder(s_layer.axis[2],s_layer.axis[3],s_layer.axis[1])
+            if layer == "layer2_0_conv1" or layer == "layer3_0_conv1":
                 continue # stride=2
             s_pad = getattr(build_resnet20,layer+"_pad")
             LB = s.reuse_at(s_pad._op,s[s_layer],s_layer.axis[2],layer+"_LB")
@@ -235,12 +237,23 @@ def build_resnet20_stream_inf(target=target):
         straight_layer_names.remove("layer2_0_concat")
         straight_layer_names.remove("layer3_0_avgpool")
         straight_layer_names.remove("layer3_0_concat")
+        straight_layer_names.remove("layer2_0_avgpool_res")
+        straight_layer_names.remove("layer3_0_avgpool_res")
+        straight_layer_names.remove("avgpool_res")
+        import heterocl.tvm as tvm
         for i,layer in enumerate(straight_layer_names):
             if i == len(straight_layer_names) - 1:
                 break
-            layer1 = getattr(build_resnet20,layer)
-            layer2 = getattr(build_resnet20,list(straight_layer_names)[i+1])
-            s.to(layer1,s[layer2])
+            if "avgpool" not in layer:
+                layer1 = getattr(build_resnet20,layer)
+                layer2 = getattr(build_resnet20,list(straight_layer_names)[i+1])
+                shape = layer1._op.shape
+            else:
+                layer1 = getattr(getattr(build_resnet20,layer),layer+"_res")
+                layer2 = getattr(build_resnet20,list(straight_layer_names)[i+1])
+                shape = getattr(build_resnet20,layer+"_res")._op.shape
+            depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
+            s.to(layer1, layer2, depth=depth.value)
         # residual streaming
         f = build_resnet20
         for layer in range(1,4):
@@ -250,17 +263,33 @@ def build_resnet20_stream_inf(target=target):
                 else:
                     prev = "layer{}_{}_rprelu2".format(layer,bb-1)
                 if not (layer != 1 and bb == 0):
+                    shape = getattr(f,prev)._op.shape
+                    depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
                     s.to(getattr(f,prev),
-                        getattr(f,"layer{}_{}_residual1".format(layer,bb)))
+                        getattr(f,"layer{}_{}_residual1".format(layer,bb)),
+                        depth=depth.value)
                 else: # 2_0 3_0
+                    shape = getattr(f,prev)._op.shape
+                    depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
                     s.to(getattr(f,prev),
-                        getattr(f,"layer{}_{}_avgpool".format(layer,bb)))
-                    s.to(getattr(f,"layer{}_{}_avgpool".format(layer,bb)),
-                        getattr(f,"layer{}_{}_concat".format(layer,bb)))
+                         getattr(f,"layer{}_{}_avgpool".format(layer,bb)),
+                         depth=depth.value)
+                    avgpool_s = getattr(getattr(f,"layer{}_{}_avgpool".format(layer,bb)),"layer{}_{}_avgpool_res".format(layer,bb))
+                    shape = getattr(f,"layer{}_{}_avgpool_res".format(layer,bb))._op.shape
+                    depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
+                    s.to(avgpool_s,
+                         getattr(f,"layer{}_{}_concat".format(layer,bb)),
+                         depth=depth.value)
+                    shape = getattr(f,"layer{}_{}_concat".format(layer,bb))._op.shape
+                    depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
                     s.to(getattr(f,"layer{}_{}_concat".format(layer,bb)),
-                        getattr(f,"layer{}_{}_residual1".format(layer,bb)))
+                         getattr(f,"layer{}_{}_residual1".format(layer,bb)),
+                         depth=depth.value)
+                shape = getattr(f,"layer{}_{}_rprelu1".format(layer,bb))._op.shape
+                depth = tvm.ir_pass.Simplify(reduce(lambda x, y: x * y, shape))
                 s.to(getattr(f,"layer{}_{}_rprelu1".format(layer,bb)),
-                    getattr(f,"layer{}_{}_residual2".format(layer,bb)))
+                     getattr(f,"layer{}_{}_residual2".format(layer,bb)),
+                     depth=depth.value)
 
     if isinstance(target,hcl.platform):
         s.to([input_image], target.xcel)
