@@ -2526,3 +2526,4 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     }
 }
 
+}
