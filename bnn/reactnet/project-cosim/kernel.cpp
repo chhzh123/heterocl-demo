@@ -21,8 +21,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     #pragma HLS stream variable=conv0_pad_pipe_1 depth=3468
     conv0_pad_not_zero: for (bit32 not_zero = 0; not_zero < 3; ++not_zero) {
       conv0_pad_index_tuple: for (bit32 index_tuple = 0; index_tuple < 34; ++index_tuple) {
-      #pragma HLS pipeline
         conv0_pad_i: for (bit32 i = 0; i < 34; ++i) {
+      #pragma HLS pipeline
           ap_fixed<32, 20> conv0_pad_temp;
           if (((((1 <= index_tuple) && (index_tuple < 33)) && (1 <= i)) && (i < 33))) { 
             conv0_pad_temp = input_image[(((((i - ((i + -1) % 32)) + (index_tuple * 32)) + (not_zero * 1024)) + -33) / 3072)][((((((i - ((i + -1) % 32)) + (index_tuple * 32)) + (not_zero * 1024)) + -33) / 1024) % 3)][((((((i - ((i + -1) % 32)) + (index_tuple * 32)) + (not_zero * 1024)) + -33) / 32) % 32)][((i + -1) % 32)];
@@ -37,11 +37,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_fixed<32, 20> conv0[1][16][32][32];
     ap_fixed<32, 20> conv0_LB[1][3][3][34];
     ap_fixed<32, 20> conv0_WB[1][3][3][3];
+    #pragma HLS array_partition variable=conv0_WB complete dim=4
     hls::stream<ap_fixed<32, 20> > conv0_pipe_2;
     #pragma HLS stream variable=conv0_pipe_2 depth=16384
     conv0_yy_reuse: for (bit32 yy_reuse = 0; yy_reuse < 34; ++yy_reuse) {
       conv0_xx_reuse: for (bit32 xx_reuse = 0; xx_reuse < 34; ++xx_reuse) {
-      #pragma HLS pipeline
         loop_conv0_pad_2: for (bit32 conv0_pad_2 = 0; conv0_pad_2 < 3; ++conv0_pad_2) {
           loop_conv0_pad_1: for (bit32 conv0_pad_1 = 0; conv0_pad_1 < 2; ++conv0_pad_1) {
             conv0_LB[0][conv0_pad_2][conv0_pad_1][xx_reuse] = conv0_LB[0][conv0_pad_2][(conv0_pad_1 + 1)][xx_reuse];
@@ -61,6 +61,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse) {
           conv0_ff: for (bit32 ff = 0; ff < 16; ++ff) {
+      #pragma HLS pipeline
               ap_fixed<32, 20> sum;
               sum = ((ap_fixed<32, 20>)0);
               conv0_rc: for (bit32 rc = 0; rc < 3; ++rc) {
@@ -118,8 +119,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer1_0_conv1_pad_pipe_5;
     #pragma HLS stream variable=layer1_0_conv1_pad_pipe_5 depth=1156
     layer1_0_conv1_pad_hh1: for (bit32 hh1 = 0; hh1 < 34; ++hh1) {
-    #pragma HLS pipeline
       layer1_0_conv1_pad_ww1: for (bit32 ww1 = 0; ww1 < 34; ++ww1) {
+    #pragma HLS pipeline
         ap_uint<16> layer1_0_conv1_pad_temp;
         layer1_0_conv1_pad_temp = ((ap_uint<16>)(((((1 <= ww1) && (ww1 < 33)) && (1 <= hh1)) && (hh1 < 33)) ? (((ubit32)layer1_0_rsign1_pipe_4.read())) : ((ubit32)0U)));
         layer1_0_conv1_pad_pipe_5.write(layer1_0_conv1_pad_temp);
@@ -129,11 +130,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer1_0_conv1[1][16][32][32];
     ap_uint<16> layer1_0_conv1_LB[1][1][3][34];
     ap_uint<16> layer1_0_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer1_0_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer1_0_conv1_pipe_6;
     #pragma HLS stream variable=layer1_0_conv1_pipe_6 depth=16384
     layer1_0_conv1_yy_reuse1: for (bit32 yy_reuse1 = 0; yy_reuse1 < 34; ++yy_reuse1) {
       layer1_0_conv1_xx_reuse1: for (bit32 xx_reuse1 = 0; xx_reuse1 < 34; ++xx_reuse1) {
-      #pragma HLS pipeline
         loop_layer1_0_conv1_pad_1: for (bit32 layer1_0_conv1_pad_1 = 0; layer1_0_conv1_pad_1 < 2; ++layer1_0_conv1_pad_1) {
           layer1_0_conv1_LB[0][0][layer1_0_conv1_pad_1][xx_reuse1] = layer1_0_conv1_LB[0][0][(layer1_0_conv1_pad_1 + 1)][xx_reuse1];
         }
@@ -149,6 +150,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse1) {
           layer1_0_conv1_ff1: for (bit32 ff1 = 0; ff1 < 16; ++ff1) {
+      #pragma HLS pipeline
               ap_int<8> layer1_0_conv1_sum;
               layer1_0_conv1_sum = (ap_int<8>)0;
               layer1_0_conv1_layer1_0_conv1_ry: for (bit32 layer1_0_conv1_ry = 0; layer1_0_conv1_ry < 3; ++layer1_0_conv1_ry) {
@@ -238,8 +240,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer1_0_conv2_pad_pipe_11;
     #pragma HLS stream variable=layer1_0_conv2_pad_pipe_11 depth=1156
     layer1_0_conv2_pad_hh5: for (bit32 hh5 = 0; hh5 < 34; ++hh5) {
-    #pragma HLS pipeline
       layer1_0_conv2_pad_ww5: for (bit32 ww5 = 0; ww5 < 34; ++ww5) {
+    #pragma HLS pipeline
         ap_uint<16> layer1_0_rsign2_temp1;
         ap_uint<16> layer1_0_conv2_pad_temp;
         layer1_0_conv2_pad_temp = ((ap_uint<16>)(((((1 <= ww5) && (ww5 < 33)) && (1 <= hh5)) && (hh5 < 33)) ? (((ubit32)layer1_0_rsign2_pipe_10.read())) : ((ubit32)0U)));
@@ -250,11 +252,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer1_0_conv2[1][16][32][32];
     ap_uint<16> layer1_0_conv2_LB[1][1][3][34];
     ap_uint<16> layer1_0_conv2_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer1_0_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer1_0_conv2_pipe_12;
     #pragma HLS stream variable=layer1_0_conv2_pipe_12 depth=16384
     layer1_0_conv2_yy_reuse2: for (bit32 yy_reuse2 = 0; yy_reuse2 < 34; ++yy_reuse2) {
       layer1_0_conv2_xx_reuse2: for (bit32 xx_reuse2 = 0; xx_reuse2 < 34; ++xx_reuse2) {
-      #pragma HLS pipeline
         loop_layer1_0_conv2_pad_1: for (bit32 layer1_0_conv2_pad_1 = 0; layer1_0_conv2_pad_1 < 2; ++layer1_0_conv2_pad_1) {
           layer1_0_conv2_LB[0][0][layer1_0_conv2_pad_1][xx_reuse2] = layer1_0_conv2_LB[0][0][(layer1_0_conv2_pad_1 + 1)][xx_reuse2];
         }
@@ -270,6 +272,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse2) {
           layer1_0_conv2_ff2: for (bit32 ff2 = 0; ff2 < 16; ++ff2) {
+      #pragma HLS pipeline
               ap_int<8> layer1_0_conv2_sum;
               layer1_0_conv2_sum = (ap_int<8>)0;
               layer1_0_conv2_layer1_0_conv2_ry: for (bit32 layer1_0_conv2_ry = 0; layer1_0_conv2_ry < 3; ++layer1_0_conv2_ry) {
@@ -359,8 +362,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer1_1_conv1_pad_pipe_17;
     #pragma HLS stream variable=layer1_1_conv1_pad_pipe_17 depth=1156
     layer1_1_conv1_pad_hh9: for (bit32 hh9 = 0; hh9 < 34; ++hh9) {
-    #pragma HLS pipeline
       layer1_1_conv1_pad_ww9: for (bit32 ww9 = 0; ww9 < 34; ++ww9) {
+    #pragma HLS pipeline
         ap_uint<16> layer1_1_rsign1_temp1;
         ap_uint<16> layer1_1_conv1_pad_temp;
         layer1_1_conv1_pad_temp = ((ap_uint<16>)(((((1 <= ww9) && (ww9 < 33)) && (1 <= hh9)) && (hh9 < 33)) ? (((ubit32)layer1_1_rsign1_pipe_16.read())) : ((ubit32)0U)));
@@ -371,11 +374,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer1_1_conv1[1][16][32][32];
     ap_uint<16> layer1_1_conv1_LB[1][1][3][34];
     ap_uint<16> layer1_1_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer1_1_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer1_1_conv1_pipe_18;
     #pragma HLS stream variable=layer1_1_conv1_pipe_18 depth=16384
     layer1_1_conv1_yy_reuse3: for (bit32 yy_reuse3 = 0; yy_reuse3 < 34; ++yy_reuse3) {
       layer1_1_conv1_xx_reuse3: for (bit32 xx_reuse3 = 0; xx_reuse3 < 34; ++xx_reuse3) {
-      #pragma HLS pipeline
         loop_layer1_1_conv1_pad_1: for (bit32 layer1_1_conv1_pad_1 = 0; layer1_1_conv1_pad_1 < 2; ++layer1_1_conv1_pad_1) {
           layer1_1_conv1_LB[0][0][layer1_1_conv1_pad_1][xx_reuse3] = layer1_1_conv1_LB[0][0][(layer1_1_conv1_pad_1 + 1)][xx_reuse3];
         }
@@ -391,6 +394,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse3) {
           layer1_1_conv1_ff3: for (bit32 ff3 = 0; ff3 < 16; ++ff3) {
+      #pragma HLS pipeline
               ap_int<8> layer1_1_conv1_sum;
               layer1_1_conv1_sum = (ap_int<8>)0;
               layer1_1_conv1_layer1_1_conv1_ry: for (bit32 layer1_1_conv1_ry = 0; layer1_1_conv1_ry < 3; ++layer1_1_conv1_ry) {
@@ -480,8 +484,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer1_1_conv2_pad_pipe_23;
     #pragma HLS stream variable=layer1_1_conv2_pad_pipe_23 depth=1156
     layer1_1_conv2_pad_hh13: for (bit32 hh13 = 0; hh13 < 34; ++hh13) {
-    #pragma HLS pipeline
       layer1_1_conv2_pad_ww13: for (bit32 ww13 = 0; ww13 < 34; ++ww13) {
+    #pragma HLS pipeline
         ap_uint<16> layer1_1_rsign2_temp1;
         ap_uint<16> layer1_1_conv2_pad_temp;
         layer1_1_conv2_pad_temp = ((ap_uint<16>)(((((1 <= ww13) && (ww13 < 33)) && (1 <= hh13)) && (hh13 < 33)) ? (((ubit32)layer1_1_rsign2_pipe_22.read())) : ((ubit32)0U)));
@@ -492,11 +496,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer1_1_conv2[1][16][32][32];
     ap_uint<16> layer1_1_conv2_LB[1][1][3][34];
     ap_uint<16> layer1_1_conv2_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer1_1_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer1_1_conv2_pipe_24;
     #pragma HLS stream variable=layer1_1_conv2_pipe_24 depth=16384
     layer1_1_conv2_yy_reuse4: for (bit32 yy_reuse4 = 0; yy_reuse4 < 34; ++yy_reuse4) {
       layer1_1_conv2_xx_reuse4: for (bit32 xx_reuse4 = 0; xx_reuse4 < 34; ++xx_reuse4) {
-      #pragma HLS pipeline
         loop_layer1_1_conv2_pad_1: for (bit32 layer1_1_conv2_pad_1 = 0; layer1_1_conv2_pad_1 < 2; ++layer1_1_conv2_pad_1) {
           layer1_1_conv2_LB[0][0][layer1_1_conv2_pad_1][xx_reuse4] = layer1_1_conv2_LB[0][0][(layer1_1_conv2_pad_1 + 1)][xx_reuse4];
         }
@@ -512,6 +516,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse4) {
           layer1_1_conv2_ff4: for (bit32 ff4 = 0; ff4 < 16; ++ff4) {
+      #pragma HLS pipeline
               ap_int<8> layer1_1_conv2_sum;
               layer1_1_conv2_sum = (ap_int<8>)0;
               layer1_1_conv2_layer1_1_conv2_ry: for (bit32 layer1_1_conv2_ry = 0; layer1_1_conv2_ry < 3; ++layer1_1_conv2_ry) {
@@ -601,8 +606,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer1_2_conv1_pad_pipe_29;
     #pragma HLS stream variable=layer1_2_conv1_pad_pipe_29 depth=1156
     layer1_2_conv1_pad_hh17: for (bit32 hh17 = 0; hh17 < 34; ++hh17) {
-    #pragma HLS pipeline
       layer1_2_conv1_pad_ww17: for (bit32 ww17 = 0; ww17 < 34; ++ww17) {
+    #pragma HLS pipeline
         ap_uint<16> layer1_2_rsign1_temp1;
         ap_uint<16> layer1_2_conv1_pad_temp;
         layer1_2_conv1_pad_temp = ((ap_uint<16>)(((((1 <= ww17) && (ww17 < 33)) && (1 <= hh17)) && (hh17 < 33)) ? (((ubit32)layer1_2_rsign1_pipe_28.read())) : ((ubit32)0U)));
@@ -613,11 +618,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer1_2_conv1[1][16][32][32];
     ap_uint<16> layer1_2_conv1_LB[1][1][3][34];
     ap_uint<16> layer1_2_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer1_2_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer1_2_conv1_pipe_30;
     #pragma HLS stream variable=layer1_2_conv1_pipe_30 depth=16384
     layer1_2_conv1_yy_reuse5: for (bit32 yy_reuse5 = 0; yy_reuse5 < 34; ++yy_reuse5) {
       layer1_2_conv1_xx_reuse5: for (bit32 xx_reuse5 = 0; xx_reuse5 < 34; ++xx_reuse5) {
-      #pragma HLS pipeline
         loop_layer1_2_conv1_pad_1: for (bit32 layer1_2_conv1_pad_1 = 0; layer1_2_conv1_pad_1 < 2; ++layer1_2_conv1_pad_1) {
           layer1_2_conv1_LB[0][0][layer1_2_conv1_pad_1][xx_reuse5] = layer1_2_conv1_LB[0][0][(layer1_2_conv1_pad_1 + 1)][xx_reuse5];
         }
@@ -633,6 +638,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse5) {
           layer1_2_conv1_ff5: for (bit32 ff5 = 0; ff5 < 16; ++ff5) {
+      #pragma HLS pipeline
               ap_int<8> layer1_2_conv1_sum;
               layer1_2_conv1_sum = (ap_int<8>)0;
               layer1_2_conv1_layer1_2_conv1_ry: for (bit32 layer1_2_conv1_ry = 0; layer1_2_conv1_ry < 3; ++layer1_2_conv1_ry) {
@@ -722,8 +728,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer1_2_conv2_pad_pipe_35;
     #pragma HLS stream variable=layer1_2_conv2_pad_pipe_35 depth=1156
     layer1_2_conv2_pad_hh21: for (bit32 hh21 = 0; hh21 < 34; ++hh21) {
-    #pragma HLS pipeline
       layer1_2_conv2_pad_ww21: for (bit32 ww21 = 0; ww21 < 34; ++ww21) {
+    #pragma HLS pipeline
         ap_uint<16> layer1_2_rsign2_temp1;
         ap_uint<16> layer1_2_conv2_pad_temp;
         layer1_2_conv2_pad_temp = ((ap_uint<16>)(((((1 <= ww21) && (ww21 < 33)) && (1 <= hh21)) && (hh21 < 33)) ? (((ubit32)layer1_2_rsign2_pipe_34.read())) : ((ubit32)0U)));
@@ -734,11 +740,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer1_2_conv2[1][16][32][32];
     ap_uint<16> layer1_2_conv2_LB[1][1][3][34];
     ap_uint<16> layer1_2_conv2_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer1_2_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer1_2_conv2_pipe_36;
     #pragma HLS stream variable=layer1_2_conv2_pipe_36 depth=16384
     layer1_2_conv2_yy_reuse6: for (bit32 yy_reuse6 = 0; yy_reuse6 < 34; ++yy_reuse6) {
       layer1_2_conv2_xx_reuse6: for (bit32 xx_reuse6 = 0; xx_reuse6 < 34; ++xx_reuse6) {
-      #pragma HLS pipeline
         loop_layer1_2_conv2_pad_1: for (bit32 layer1_2_conv2_pad_1 = 0; layer1_2_conv2_pad_1 < 2; ++layer1_2_conv2_pad_1) {
           layer1_2_conv2_LB[0][0][layer1_2_conv2_pad_1][xx_reuse6] = layer1_2_conv2_LB[0][0][(layer1_2_conv2_pad_1 + 1)][xx_reuse6];
         }
@@ -754,6 +760,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse6) {
           layer1_2_conv2_ff6: for (bit32 ff6 = 0; ff6 < 16; ++ff6) {
+      #pragma HLS pipeline
               ap_int<8> layer1_2_conv2_sum;
               layer1_2_conv2_sum = (ap_int<8>)0;
               layer1_2_conv2_layer1_2_conv2_ry: for (bit32 layer1_2_conv2_ry = 0; layer1_2_conv2_ry < 3; ++layer1_2_conv2_ry) {
@@ -843,19 +850,19 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ap_uint<16> > layer2_0_conv1_pad_pipe_41;
     #pragma HLS stream variable=layer2_0_conv1_pad_pipe_41 depth=1156
     layer2_0_conv1_pad_hh: for (bit32 hh = 0; hh < 34; ++hh) {
-    #pragma HLS pipeline
       layer2_0_conv1_pad_ww: for (bit32 ww = 0; ww < 34; ++ww) {
+    #pragma HLS pipeline
         layer2_0_conv1_pad_pipe_41.write(((ap_uint<16>)(((((1 <= ww) && (ww < 33)) && (1 <= hh)) && (hh < 33)) ? (((ubit32)layer2_0_rsign1_pipe_40.read())) : ((ubit32)0U))));
       }
     }
     ap_int<8> layer2_0_conv1[1][32][16][16];
     ap_uint<16> layer2_0_conv1_LB[1][1][3][18];
     ap_uint<16> layer2_0_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer2_0_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer2_0_conv1_pipe_42;
     #pragma HLS stream variable=layer2_0_conv1_pipe_42 depth=8192
       layer2_0_conv1_yy_reuse: for (bit32 yy_reuse = 0; yy_reuse < 34; ++yy_reuse) {
         layer2_0_conv1_xx_reuse: for (bit32 xx_reuse = 0; xx_reuse < 34; ++xx_reuse) {
-      #pragma HLS pipeline
           loop_layer2_0_conv1_pad_1: for (bit32 layer2_0_conv1_pad_1 = 0; layer2_0_conv1_pad_1 < 2; ++layer2_0_conv1_pad_1) {
             layer2_0_conv1_LB[0][0][layer2_0_conv1_pad_1][xx_reuse] = layer2_0_conv1_LB[0][0][(layer2_0_conv1_pad_1 + 1)][xx_reuse];
           }
@@ -871,6 +878,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
               ap_uint<16> layer2_0_conv1_sum;
               layer2_0_conv1_sum = (ap_uint<16>)0;
     layer2_0_conv1_ff: for (bit32 ff = 0; ff < 32; ++ff) {
+      #pragma HLS pipeline
               layer2_0_conv1_layer2_0_conv1_ry: for (bit32 layer2_0_conv1_ry = 0; layer2_0_conv1_ry < 3; ++layer2_0_conv1_ry) {
                 layer2_0_conv1_layer2_0_conv1_rx: for (bit32 layer2_0_conv1_rx = 0; layer2_0_conv1_rx < 3; ++layer2_0_conv1_rx) {
                   layer2_0_conv1_layer2_0_conv1_rb: for (bit32 layer2_0_conv1_rb = 0; layer2_0_conv1_rb < 16; ++layer2_0_conv1_rb) {
@@ -1002,8 +1010,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ubit32 > layer2_0_conv2_pad_pipe_47;
     #pragma HLS stream variable=layer2_0_conv2_pad_pipe_47 depth=324
     layer2_0_conv2_pad_hh31: for (bit32 hh31 = 0; hh31 < 18; ++hh31) {
-    #pragma HLS pipeline
       layer2_0_conv2_pad_ww30: for (bit32 ww30 = 0; ww30 < 18; ++ww30) {
+    #pragma HLS pipeline
         ubit32 layer2_0_rsign2_temp1;
         ubit32 layer2_0_conv2_pad_temp;
         if (((((1 <= ww30) && (ww30 < 17)) && (1 <= hh31)) && (hh31 < 17))) { 
@@ -1017,11 +1025,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer2_0_conv2[1][32][16][16];
     ubit32 layer2_0_conv2_LB[1][1][3][18];
     ubit32 layer2_0_conv2_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer2_0_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer2_0_conv2_pipe_48;
     #pragma HLS stream variable=layer2_0_conv2_pipe_48 depth=8192
     layer2_0_conv2_yy_reuse7: for (bit32 yy_reuse7 = 0; yy_reuse7 < 18; ++yy_reuse7) {
       layer2_0_conv2_xx_reuse7: for (bit32 xx_reuse7 = 0; xx_reuse7 < 18; ++xx_reuse7) {
-      #pragma HLS pipeline
         loop_layer2_0_conv2_pad_1: for (bit32 layer2_0_conv2_pad_1 = 0; layer2_0_conv2_pad_1 < 2; ++layer2_0_conv2_pad_1) {
           layer2_0_conv2_LB[0][0][layer2_0_conv2_pad_1][xx_reuse7] = layer2_0_conv2_LB[0][0][(layer2_0_conv2_pad_1 + 1)][xx_reuse7];
         }
@@ -1037,6 +1045,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse7) {
           layer2_0_conv2_ff8: for (bit32 ff8 = 0; ff8 < 32; ++ff8) {
+      #pragma HLS pipeline
               ap_int<8> layer2_0_conv2_sum;
               layer2_0_conv2_sum = (ap_int<8>)0;
               layer2_0_conv2_layer2_0_conv2_ry: for (bit32 layer2_0_conv2_ry = 0; layer2_0_conv2_ry < 3; ++layer2_0_conv2_ry) {
@@ -1126,8 +1135,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ubit32 > layer2_1_conv1_pad_pipe_53;
     #pragma HLS stream variable=layer2_1_conv1_pad_pipe_53 depth=324
     layer2_1_conv1_pad_hh35: for (bit32 hh35 = 0; hh35 < 18; ++hh35) {
-    #pragma HLS pipeline
       layer2_1_conv1_pad_ww34: for (bit32 ww34 = 0; ww34 < 18; ++ww34) {
+    #pragma HLS pipeline
         ubit32 layer2_1_rsign1_temp1;
         ubit32 layer2_1_conv1_pad_temp;
         if (((((1 <= ww34) && (ww34 < 17)) && (1 <= hh35)) && (hh35 < 17))) { 
@@ -1142,11 +1151,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer2_1_conv1[1][32][16][16];
     ubit32 layer2_1_conv1_LB[1][1][3][18];
     ubit32 layer2_1_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer2_1_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer2_1_conv1_pipe_54;
     #pragma HLS stream variable=layer2_1_conv1_pipe_54 depth=8192
     layer2_1_conv1_yy_reuse7: for (bit32 yy_reuse7 = 0; yy_reuse7 < 18; ++yy_reuse7) {
       layer2_1_conv1_xx_reuse7: for (bit32 xx_reuse7 = 0; xx_reuse7 < 18; ++xx_reuse7) {
-      #pragma HLS pipeline
         loop_layer2_1_conv1_pad_1: for (bit32 layer2_1_conv1_pad_1 = 0; layer2_1_conv1_pad_1 < 2; ++layer2_1_conv1_pad_1) {
           layer2_1_conv1_LB[0][0][layer2_1_conv1_pad_1][xx_reuse7] = layer2_1_conv1_LB[0][0][(layer2_1_conv1_pad_1 + 1)][xx_reuse7];
         }
@@ -1162,6 +1171,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse7) {
           layer2_1_conv1_ff9: for (bit32 ff9 = 0; ff9 < 32; ++ff9) {
+      #pragma HLS pipeline
               ap_int<8> layer2_1_conv1_sum;
               layer2_1_conv1_sum = (ap_int<8>)0;
               layer2_1_conv1_layer2_1_conv1_ry: for (bit32 layer2_1_conv1_ry = 0; layer2_1_conv1_ry < 3; ++layer2_1_conv1_ry) {
@@ -1251,8 +1261,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ubit32 > layer2_1_conv2_pad_pipe_59;
     #pragma HLS stream variable=layer2_1_conv2_pad_pipe_59 depth=324
     layer2_1_conv2_pad_hh39: for (bit32 hh39 = 0; hh39 < 18; ++hh39) {
-    #pragma HLS pipeline
       layer2_1_conv2_pad_ww38: for (bit32 ww38 = 0; ww38 < 18; ++ww38) {
+    #pragma HLS pipeline
         ubit32 layer2_1_rsign2_temp1;
         ubit32 layer2_1_conv2_pad_temp;
         if (((((1 <= ww38) && (ww38 < 17)) && (1 <= hh39)) && (hh39 < 17))) { 
@@ -1267,11 +1277,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer2_1_conv2[1][32][16][16];
     ubit32 layer2_1_conv2_LB[1][1][3][18];
     ubit32 layer2_1_conv2_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer2_1_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer2_1_conv2_pipe_60;
     #pragma HLS stream variable=layer2_1_conv2_pipe_60 depth=8192
     layer2_1_conv2_yy_reuse8: for (bit32 yy_reuse8 = 0; yy_reuse8 < 18; ++yy_reuse8) {
       layer2_1_conv2_xx_reuse8: for (bit32 xx_reuse8 = 0; xx_reuse8 < 18; ++xx_reuse8) {
-      #pragma HLS pipeline
         loop_layer2_1_conv2_pad_1: for (bit32 layer2_1_conv2_pad_1 = 0; layer2_1_conv2_pad_1 < 2; ++layer2_1_conv2_pad_1) {
           layer2_1_conv2_LB[0][0][layer2_1_conv2_pad_1][xx_reuse8] = layer2_1_conv2_LB[0][0][(layer2_1_conv2_pad_1 + 1)][xx_reuse8];
         }
@@ -1287,6 +1297,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse8) {
           layer2_1_conv2_ff10: for (bit32 ff10 = 0; ff10 < 32; ++ff10) {
+      #pragma HLS pipeline
               ap_int<8> layer2_1_conv2_sum;
               layer2_1_conv2_sum = (ap_int<8>)0;
               layer2_1_conv2_layer2_1_conv2_ry: for (bit32 layer2_1_conv2_ry = 0; layer2_1_conv2_ry < 3; ++layer2_1_conv2_ry) {
@@ -1376,8 +1387,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ubit32 > layer2_2_conv1_pad_pipe_65;
     #pragma HLS stream variable=layer2_2_conv1_pad_pipe_65 depth=324
     layer2_2_conv1_pad_hh43: for (bit32 hh43 = 0; hh43 < 18; ++hh43) {
-    #pragma HLS pipeline
       layer2_2_conv1_pad_ww42: for (bit32 ww42 = 0; ww42 < 18; ++ww42) {
+    #pragma HLS pipeline
         ubit32 layer2_2_rsign1_temp1;
         ubit32 layer2_2_conv1_pad_temp;
         if (((((1 <= ww42) && (ww42 < 17)) && (1 <= hh43)) && (hh43 < 17))) { 
@@ -1392,11 +1403,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer2_2_conv1[1][32][16][16];
     ubit32 layer2_2_conv1_LB[1][1][3][18];
     ubit32 layer2_2_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer2_2_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer2_2_conv1_pipe_66;
     #pragma HLS stream variable=layer2_2_conv1_pipe_66 depth=8192
     layer2_2_conv1_yy_reuse9: for (bit32 yy_reuse9 = 0; yy_reuse9 < 18; ++yy_reuse9) {
       layer2_2_conv1_xx_reuse9: for (bit32 xx_reuse9 = 0; xx_reuse9 < 18; ++xx_reuse9) {
-      #pragma HLS pipeline
         loop_layer2_2_conv1_pad_1: for (bit32 layer2_2_conv1_pad_1 = 0; layer2_2_conv1_pad_1 < 2; ++layer2_2_conv1_pad_1) {
           layer2_2_conv1_LB[0][0][layer2_2_conv1_pad_1][xx_reuse9] = layer2_2_conv1_LB[0][0][(layer2_2_conv1_pad_1 + 1)][xx_reuse9];
         }
@@ -1412,6 +1423,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse9) {
           layer2_2_conv1_ff11: for (bit32 ff11 = 0; ff11 < 32; ++ff11) {
+      #pragma HLS pipeline
               ap_int<8> layer2_2_conv1_sum;
               layer2_2_conv1_sum = (ap_int<8>)0;
               layer2_2_conv1_layer2_2_conv1_ry: for (bit32 layer2_2_conv1_ry = 0; layer2_2_conv1_ry < 3; ++layer2_2_conv1_ry) {
@@ -1501,8 +1513,8 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     hls::stream<ubit32 > layer2_2_conv2_pad_pipe_71;
     #pragma HLS stream variable=layer2_2_conv2_pad_pipe_71 depth=324
     layer2_2_conv2_pad_hh47: for (bit32 hh47 = 0; hh47 < 18; ++hh47) {
-    #pragma HLS pipeline
       layer2_2_conv2_pad_ww46: for (bit32 ww46 = 0; ww46 < 18; ++ww46) {
+    #pragma HLS pipeline
         ubit32 layer2_2_rsign2_temp1;
         ubit32 layer2_2_conv2_pad_temp;
         if (((((1 <= ww46) && (ww46 < 17)) && (1 <= hh47)) && (hh47 < 17))) { 
@@ -1517,11 +1529,11 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer2_2_conv2[1][32][16][16];
     ubit32 layer2_2_conv2_LB[1][1][3][18];
     ubit32 layer2_2_conv2_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer2_2_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer2_2_conv2_pipe_72;
     #pragma HLS stream variable=layer2_2_conv2_pipe_72 depth=8192
     layer2_2_conv2_yy_reuse10: for (bit32 yy_reuse10 = 0; yy_reuse10 < 18; ++yy_reuse10) {
       layer2_2_conv2_xx_reuse10: for (bit32 xx_reuse10 = 0; xx_reuse10 < 18; ++xx_reuse10) {
-      #pragma HLS pipeline
         loop_layer2_2_conv2_pad_1: for (bit32 layer2_2_conv2_pad_1 = 0; layer2_2_conv2_pad_1 < 2; ++layer2_2_conv2_pad_1) {
           layer2_2_conv2_LB[0][0][layer2_2_conv2_pad_1][xx_reuse10] = layer2_2_conv2_LB[0][0][(layer2_2_conv2_pad_1 + 1)][xx_reuse10];
         }
@@ -1537,6 +1549,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
           }
             if (2 <= xx_reuse10) {
           layer2_2_conv2_ff12: for (bit32 ff12 = 0; ff12 < 32; ++ff12) {
+      #pragma HLS pipeline
               ap_int<8> layer2_2_conv2_sum;
               layer2_2_conv2_sum = (ap_int<8>)0;
               layer2_2_conv2_layer2_2_conv2_ry: for (bit32 layer2_2_conv2_ry = 0; layer2_2_conv2_ry < 3; ++layer2_2_conv2_ry) {
@@ -1627,6 +1640,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     #pragma HLS stream variable=layer3_0_conv1_pad_pipe_77 depth=324
     layer3_0_conv1_pad_hh: for (bit32 hh = 0; hh < 18; ++hh) {
       layer3_0_conv1_pad_ww: for (bit32 ww = 0; ww < 18; ++ww) {
+      #pragma HLS pipeline
         ubit32 layer3_0_conv1_pad_temp;
         if (((((1 <= ww) && (ww < 17)) && (1 <= hh)) && (hh < 17))) { 
           layer3_0_conv1_pad_temp = layer3_0_rsign1_pipe_76.read();
@@ -1638,6 +1652,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     }
     ubit32 layer3_0_conv1_LB[1][1][3][18];
     ubit32 layer3_0_conv1_WB[1][1][3][3];
+    #pragma HLS array_partition variable=layer3_0_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer3_0_conv1_pipe_78;
     #pragma HLS stream variable=layer3_0_conv1_pipe_78 depth=4096
       layer3_0_conv1_yy_reuse: for (bit32 yy_reuse = 0; yy_reuse < 18; ++yy_reuse) {
@@ -1808,6 +1823,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer3_0_conv2[1][64][8][8];
     ubit32 layer3_0_conv2_LB[1][2][3][10];
     ubit32 layer3_0_conv2_WB[1][2][3][3];
+    #pragma HLS array_partition variable=layer3_0_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer3_0_conv2_pipe_84;
     #pragma HLS stream variable=layer3_0_conv2_pipe_84 depth=4096
     layer3_0_conv2_yy_reuse12: for (bit32 yy_reuse12 = 0; yy_reuse12 < 10; ++yy_reuse12) {
@@ -1943,6 +1959,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer3_1_conv1[1][64][8][8];
     ubit32 layer3_1_conv1_LB[1][2][3][10];
     ubit32 layer3_1_conv1_WB[1][2][3][3];
+    #pragma HLS array_partition variable=layer3_1_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer3_1_conv1_pipe_90;
     #pragma HLS stream variable=layer3_1_conv1_pipe_90 depth=4096
     layer3_1_conv1_yy_reuse11: for (bit32 yy_reuse11 = 0; yy_reuse11 < 10; ++yy_reuse11) {
@@ -2078,6 +2095,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer3_1_conv2[1][64][8][8];
     ubit32 layer3_1_conv2_LB[1][2][3][10];
     ubit32 layer3_1_conv2_WB[1][2][3][3];
+    #pragma HLS array_partition variable=layer3_1_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer3_1_conv2_pipe_96;
     #pragma HLS stream variable=layer3_1_conv2_pipe_96 depth=4096
     layer3_1_conv2_yy_reuse12: for (bit32 yy_reuse12 = 0; yy_reuse12 < 10; ++yy_reuse12) {
@@ -2213,6 +2231,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer3_2_conv1[1][64][8][8];
     ubit32 layer3_2_conv1_LB[1][2][3][10];
     ubit32 layer3_2_conv1_WB[1][2][3][3];
+    #pragma HLS array_partition variable=layer3_2_conv1_WB complete dim=4
     hls::stream<ap_int<8> > layer3_2_conv1_pipe_102;
     #pragma HLS stream variable=layer3_2_conv1_pipe_102 depth=4096
     layer3_2_conv1_yy_reuse13: for (bit32 yy_reuse13 = 0; yy_reuse13 < 10; ++yy_reuse13) {
@@ -2348,6 +2367,7 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
     ap_int<8> layer3_2_conv2[1][64][8][8];
     ubit32 layer3_2_conv2_LB[1][2][3][10];
     ubit32 layer3_2_conv2_WB[1][2][3][3];
+    #pragma HLS array_partition variable=layer3_2_conv2_WB complete dim=4
     hls::stream<ap_int<8> > layer3_2_conv2_pipe_108;
     #pragma HLS stream variable=layer3_2_conv2_pipe_108 depth=4096
     layer3_2_conv2_yy_reuse14: for (bit32 yy_reuse14 = 0; yy_reuse14 < 10; ++yy_reuse14) {
