@@ -1,6 +1,7 @@
 import heterocl as hcl
 import numpy as np
 import hlib.op.bnn as bnn
+import hlib.op.nn as nn
 
 SIZE = 6
 KERNEL_SIZE = 3
@@ -160,10 +161,73 @@ def conv6():
     hcl_B = hcl.asarray(np.zeros((1,64,16,16)), hcl.UInt(16))
     f(hcl_A, hcl_F, hcl_B)
 
+def conv7():
+    dtype = hcl.UInt(4)
+    A = hcl.placeholder((1, 8, 8, 1), name="A", dtype=dtype)
+    F = hcl.placeholder((3, 3, 1, 16), name="F", dtype=dtype)
+
+    def kernel(A, F):
+        return nn.conv2d_nhwc(A, F, padding=[1,1], name="conv1", out_dtype=hcl.UInt(16))
+
+    s = hcl.create_schedule([A, F], kernel)
+    s_conv = kernel.conv1
+    # LB = s.reuse_at(kernel.conv1_pad._op, s[s_conv], s_conv.axis[1], "LB")
+    # WB = s.reuse_at(LB, s[s_conv], s_conv.axis[2], "WB")
+    # s[kernel.B].pipeline(kernel.B.axis[2])
+
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls",mode="csim",project="conv")
+    s.to([A, F], target.xcel)
+    s.to(kernel.conv1, target.host)
+    f = hcl.build(s, target=target)
+    hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape), dtype)
+    hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape), dtype)
+    hcl_B = hcl.asarray(np.zeros((1,16,8,8)), hcl.UInt(16))
+    f(hcl_A, hcl_F, hcl_B)
+
+def conv8():
+    dtype = hcl.UInt(4)
+    A = hcl.placeholder((1, 8, 8, 1), name="A", dtype=dtype)
+    F = hcl.placeholder((16, 3, 3, 1), name="F", dtype=dtype)
+
+    def kernel(A, F):
+        name = "conv1"
+        ry = hcl.reduce_axis(0, 3, name=name+'_ry')
+        rx = hcl.reduce_axis(0, 3, name=name+'_rx')
+        rc_ = 0
+        rc = hcl.reduce_axis(0, 1, name=name+'_rc')
+        batch, out_height, out_width, out_channel = (1, 6, 6, 16)
+        return hcl.compute(
+            (batch, out_height, out_width, out_channel),
+            lambda nn, yy, xx, ff: hcl.sum(
+                A[nn, yy + ry, xx + rx, rc_] *
+                F[ff, ry, rx, rc_], axis=[ry, rx, rc],
+                name=name+"_sum", dtype=hcl.UInt(16)), name=name, dtype=hcl.UInt(16))
+
+    s = hcl.create_schedule([A, F], kernel)
+    s_conv = kernel.conv1
+    LB = s.reuse_at(A, s[s_conv], s_conv.axis[1], "LB")
+    WB = s.reuse_at(LB, s[s_conv], s_conv.axis[2], "WB")
+    s.partition(F, dim=0)
+    s.partition(kernel.conv1, dim=4)
+    s[kernel.conv1].pipeline(kernel.conv1.axis[2])
+
+    target = hcl.platform.zc706
+    target.config(compile="vivado_hls",mode="csyn",project="conv")
+    s.to([A, F], target.xcel)
+    s.to(kernel.conv1, target.host)
+    f = hcl.build(s, target=target)
+    hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape), dtype)
+    hcl_F = hcl.asarray(np.random.randint(0, 10, F.shape), dtype)
+    hcl_B = hcl.asarray(np.zeros((1,6,6,16)), hcl.UInt(16))
+    f(hcl_A, hcl_F, hcl_B)
+
 if __name__ == "__main__":
     # conv1()
     # conv2()
     # conv3()
     # conv4()
-    conv5()
+    # conv5()
     # conv6()
+    # conv7()
+    conv8()
