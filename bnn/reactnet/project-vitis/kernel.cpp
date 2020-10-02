@@ -2530,3 +2530,4 @@ void test(ap_fixed<32, 20> input_image[1][3][32][32], ap_fixed<32, 20> fc[1][10]
       fc[0][j2] = ((ap_fixed<32, 20>)(((ap_fixed<33, 21>)fc_matmul_temp1) + ((ap_fixed<33, 21>)w_fc_168[j2])));
     }
 }
+}
